@@ -277,9 +277,13 @@ tr:hover td{background:rgba(236,254,255,.3)}
 <div id="modalRoot"></div>
 
 <script>
+// VISIBLE ERROR CATCHER
+window.onerror=function(m,s,l,c,e){try{var d=document.getElementById("loginErr");if(d)d.textContent="JS Error: "+m+" (line "+l+")";}catch(x){}return false;};
+try{
+
 // ============ LOCAL STORAGE BACKEND ============
 (function(){
-var LK="borun_db";
+var LK="borun_db";try{document.getElementById("loginErr").textContent="v3.1 loading...";}catch(e){}
 function ubtoa(s){var b=[],i,c;for(i=0;i<s.length;i++){c=s.charCodeAt(i);if(c<128)b.push(c);else if(c<2048)b.push(192|(c>>6),128|(c&63));else b.push(224|(c>>12),128|((c>>6)&63),128|(c&63));}return btoa(String.fromCharCode.apply(null,b));}
 function uatob(s){var bin=atob(s),b=[],i=0,j=0,r="";for(j=0;j<bin.length;j++)b.push(bin.charCodeAt(j));while(i<b.length){var c=b[i];if(c<128){r+=String.fromCharCode(c);i++;}else if(c<224){r+=String.fromCharCode(((c&31)<<6)|(b[i+1]&63));i+=2;}else{r+=String.fromCharCode(((c&15)<<12)|((b[i+1]&63)<<6)|(b[i+2]&63));i+=3;}}return r;}
 

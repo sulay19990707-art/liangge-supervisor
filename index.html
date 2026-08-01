@@ -237,12 +237,12 @@ tr:hover td{background:rgba(236,254,255,.3)}
     <h1>益彩晶流量号组</h1>
     <p class="sub">数据驱动 · 智能统计 · 趋势分析</p>
     <input id="loginUser" placeholder="账号" autocomplete="username" />
-    <input id="loginPwd" type="password" placeholder="密码" autocomplete="current-password" />
+    <input id="loginPwd" type="password" placeholder="密码" autocomplete="current-password" onkeydown="if(event.key==='Enter')tryLogin()" />
     <div class="remember-row">
       <input type="checkbox" id="loginRemember" />
       <label for="loginRemember">记住账号密码</label>
     </div>
-    <button id="loginBtn">登 录</button>
+    <button id="loginBtn" onclick="tryLogin()">登 录</button>
     <div class="login-err" id="loginErr"></div>
   </div>
 </div>

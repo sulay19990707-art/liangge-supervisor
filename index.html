@@ -226,6 +226,7 @@ tr:hover td{background:rgba(236,254,255,.3)}
   .modal-body .field-row{grid-template-columns:1fr 1fr}
 }
 </style>
+<meta name="version" content="v3-20260802">
 </head>
 <body>
 
@@ -716,7 +717,7 @@ async function loadTrendChart(){
     daily.forEach(function(d,i){var x=pL+(cW/(daily.length-1||1))*i,y=pT+cH-(d[m]||0)/maxVal*cH;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);});ctx.stroke();
     // Dot every N points
     var dotStep=Math.max(1,Math.floor(daily.length/20));
-    daily.forEach(function(d,i){if(i%dotStep===0||i===daily.length-1){var x=pL+(cW/(daily.length-1||1))*i,y=pT+cH-(d[m]||0)/maxVal*cH;ctx.fillStyle=colors[m];ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);ctx.fill();}});
+    daily.forEach(function(d,i){if(i%dotStep===0||i===daily.length-1){var x=pL+(cW/(daily.length-1||1))*i,y=pT+cH-(d[m]||0)/maxVal*cH;var prevVal=i>0?(daily[i-1][m]||0):(d[m]||0);var currVal=d[m]||0;var diff=currVal-prevVal,dirColor=Math.abs(diff)<(maxVal*0.03)?"#d97706":diff>0?"#059669":"#dc2626";ctx.fillStyle=colors[m];ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fill();ctx.fillStyle=dirColor;ctx.beginPath();ctx.arc(x,y,2.5,0,Math.PI*2);ctx.fill();}});
   });
 
   // Monthly rates

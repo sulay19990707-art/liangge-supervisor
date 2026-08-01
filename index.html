@@ -377,31 +377,7 @@ tr:hover td{background:#fafafe}
 .sidebar-collapse-btn{display:flex;position:fixed;bottom:20px;right:20px;width:48px;height:48px;border-radius:50%;background:var(--blue);color:#fff;font-size:22px;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,113,227,.4);z-index:35;border:none;cursor:pointer}
 }
 </style>
-<script src="https://beacon.cdn.qq.com/sdk/4.5.9/beacon_web.min.js"></script>
-<script>
-(function(){
-function ubtoa(s){return btoa(unescape(encodeURIComponent(s)));}
-function uatob(s){return decodeURIComponent(escape(atob(s)));}
-
-  try{
-    var beacon=new BeaconAction({
-      appkey:'0WEB06U85YBSLJNL',
-      versionCode:'1.0.0',
-      channelID:'share',
-      delay:1000,
-      sessionDuration:30*60*1000,
-      isOversea:false,
-      needReportRqdEvent:false
-    });
-    beacon.onDirectUserAction('preview_page_view',{
-      'url':location.href,
-      'referrer':document.referrer,
-      'title':document.title,
-      'sandbox_id':'821e4f7d7151424aa6e68ddfc97c60ef'
-    });
-  }catch(e){}
-})();
-</script></head>
+</head>
 <body>
 
 <!-- Login -->
@@ -414,7 +390,7 @@ function uatob(s){return decodeURIComponent(escape(atob(s)));}
     <input id="loginPwd" type="password" placeholder="密码" autocomplete="current-password" />
     <button id="loginBtn">登 录</button>
     <div class="login-err" id="loginErr"></div>
-    <div class="login-hint">管理员账号: admin / admin<br/>主管、组长、组员账号由上级创建</div>
+    
   </div>
 </div>
 
@@ -460,788 +436,129 @@ function uatob(s){return decodeURIComponent(escape(atob(s)));}
 <div class="notif-panel" id="notifPanel"></div>
 
 <script>
-// ============ LOCAL STORAGE BACKEND (replaces server) ============
+
+// ============ LOCAL STORAGE BACKEND ============
 (function(){
-var LK = "liangge_db";
+var LK="liangge_db";
+function ubtoa(s){return btoa(unescape(encodeURIComponent(s)));}
+function uatob(s){return decodeURIComponent(escape(atob(s)));}
+function def(){return{users:[{id:"boss",username:"admin",password:"admin",role:"boss",name:"管理员",group_id:null,parent_id:null}],groups:[],records:[],prices:{arrive:300,order:800},hr_stats:{active_count:0,attendance_today:0,hiring_positions:0,monthly_turnover_rate:0},mobile_assets:{total:0,in_use:0,idle:0,accounts_preparing:0},disease_stats:{vitiligo:0,psoriasis:0,dermatitis:0},todos:[]};}
+function ld(){try{var r=localStorage.getItem(LK);return r?JSON.parse(r):def();}catch(e){return def();}}
+var D=ld();function sv(){try{localStorage.setItem(LK,JSON.stringify(D));}catch(e){}}
+function gid(p){return p+"_"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+function ts(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function sign(u){var p=JSON.stringify({id:u.id,role:u.role,name:u.name,group_id:u.group_id,parent_id:u.parent_id});return ubtoa(p)+"."+ubtoa("sig_"+u.id);}
+function verify(tk){if(!tk)return null;var p=tk.split(".");if(p.length!==2)return null;try{return JSON.parse(uatob(p[0]));}catch(e){return null;}}
 
-function def() {
-  return {
-    users: [{ id: "boss", username: "admin", password: "admin", role: "boss", name: "管理员", group_id: null, parent_id: null }],
-    groups: [], records: [], prices: { arrive: 300, order: 800 },
-    hr_stats: { active_count: 0, attendance_today: 0, hiring_positions: 0, monthly_turnover_rate: 0 },
-    mobile_assets: { total: 0, in_use: 0, idle: 0, accounts_preparing: 0 },
-    disease_stats: { vitiligo: 0, psoriasis: 0, dermatitis: 0 },
-    todos: []
-  };
+function uidg(gid_){var t=D.users.filter(function(u){return u.role==="team_leader"&&u.group_id===gid_;}).map(function(x){return x.id;});var m=D.users.filter(function(u){return u.role==="team_member"&&t.indexOf(u.parent_id)>=0;});return t.concat(m.map(function(x){return x.id;}));}
+function uidtl(tid){var m=D.users.filter(function(u){return u.role==="team_member"&&u.parent_id===tid;});return[tid].concat(m.map(function(x){return x.id;}));}
+function sf(ids){var t=ts(),mp=t.slice(0,7),l=0,a=0,o=0,r=0,ml=0,ma=0,mo=0,mr=0;ids.forEach(function(id){D.records.filter(function(rec){return rec.user_id===id;}).forEach(function(rec){var rev=(rec.arrive||0)*D.prices.arrive+(rec.orders||0)*D.prices.order;if(rec.date===t){l+=rec.leads||0;a+=rec.arrive||0;o+=rec.orders||0;r+=rev;}if(rec.date.slice(0,7)===mp){ml+=rec.leads||0;ma+=rec.arrive||0;mo+=rec.orders||0;mr+=rev;}});});return{leads:l,arrive:a,orders:o,revenue:r,monthLeads:ml,monthArrive:ma,monthOrders:mo,monthRevenue:mr};}
+function sfd(ids,ds){var l=0,a=0,o=0,r=0;ids.forEach(function(id){D.records.filter(function(rec){return rec.user_id===id&&rec.date===ds;}).forEach(function(rec){l+=rec.leads||0;a+=rec.arrive||0;o+=rec.orders||0;r+=(rec.arrive||0)*D.prices.arrive+(rec.orders||0)*D.prices.order;});});return{leads:l,arrive:a,orders:o,revenue:r};}
+function arrow(c,p){if(p===0&&c>0)return{dir:"up",pct:100};if(p===0&&c===0)return{dir:"flat",pct:0};var v=Math.round(((c-p)/p)*1000)/10;return{dir:v>0?"up":v<0?"down":"flat",pct:Math.abs(v)};}
+
+function postLogin(b){if(!b.username||!b.password)return[400,{error:"请输入账号和密码"}];var u=D.users.find(function(x){return x.username===b.username;});if(!u)return[401,{error:"账号不存在"}];if(u.password!==b.password)return[401,{error:"密码错误"}];var user={id:u.id,role:u.role,name:u.name,group_id:u.group_id,parent_id:u.parent_id};return[200,{token:sign(user),user:user}];}
+function getMe(tk){var u=verify(tk);if(!u)return[401,{error:"未登录"}];var r=D.users.find(function(x){return x.id===u.id;});if(!r)return[401,{error:"用户不存在"}];return[200,{user:{id:r.id,role:r.role,name:r.name,group_id:r.group_id,parent_id:r.parent_id}}];}
+
+function getDashboard(tk){var u=verify(tk);if(!u)return[401,{error:"未登录"}];var role=u.role,t_=ts();if(role==="boss"){var y=ts();y=new Date(new Date(y).getTime()-86400000).toISOString().slice(0,10);var gs=D.groups.map(function(g){var ids=uidg(g.id),s=sf(ids),yStat=sfd(ids,y),tls_=D.users.filter(function(x){return x.role==="team_leader"&&x.group_id===g.id;});return{id:g.id,name:g.name,supervisor_name:g.supervisor_name,team_leader_count:tls_.length,leads:s.leads,arrive:s.arrive,orders:s.orders,revenue:s.revenue,monthLeads:s.monthLeads,monthArrive:s.monthArrive,monthOrders:s.monthOrders,monthRevenue:s.monthRevenue,yesterday:yStat,arrows:{leads:arrow(s.leads,yStat.leads),arrive:arrow(s.arrive,yStat.arrive),orders:arrow(s.orders,yStat.orders),revenue:arrow(s.revenue,yStat.revenue)}};});var tr=D.records.filter(function(r){return r.date===t_;}),wf={draft:tr.filter(function(r){return r.status==="draft";}).length,confirmed:tr.filter(function(r){return r.status==="confirmed";}).length,approved:tr.filter(function(r){return r.status==="approved";}).length,rejected:tr.filter(function(r){return r.status==="rejected";}).length,total:tr.length};return[200,{role:"boss",groups:gs,prices:D.prices,hr_stats:D.hr_stats||{},mobile_assets:D.mobile_assets||{},disease_stats:D.disease_stats||{},todos:D.todos||[],workflow:wf}];}
+if(role==="supervisor"){var gid_=u.group_id,g=D.groups.find(function(x){return x.id===gid_;});if(!g)return[200,{role:"supervisor",group:null,team_leaders:[],total:{},prices:D.prices}];var tls_=D.users.filter(function(x){return x.role==="team_leader"&&x.group_id===gid_;}).map(function(tl){var mids=D.users.filter(function(x){return x.role==="team_member"&&x.parent_id===tl.id;}).map(function(m){return m.id;}),aids=[tl.id].concat(mids),s=sf(aids),tdr=D.records.find(function(r){return r.user_id===tl.id&&r.date===t_;});return{id:tl.id,name:tl.name,username:tl.username,leads:s.leads,arrive:s.arrive,orders:s.orders,revenue:s.revenue,monthLeads:s.monthLeads,monthArrive:s.monthArrive,monthOrders:s.monthOrders,monthRevenue:s.monthRevenue,today_record:tdr||null,member_count:mids.length};}),aids=uidg(gid_),total=sf(aids),guids=uidg(gid_),tgr=D.records.filter(function(r){return r.date===t_&&guids.indexOf(r.user_id)>=0;}),wf={draft:tgr.filter(function(r){return r.status==="draft";}).length,confirmed:tgr.filter(function(r){return r.status==="confirmed";}).length,approved:tgr.filter(function(r){return r.status==="approved";}).length,rejected:tgr.filter(function(r){return r.status==="rejected";}).length};return[200,{role:"supervisor",group:{id:g.id,name:g.name},team_leaders:tls_,total:total,prices:D.prices,workflow:wf}];}
+if(role==="team_leader"){var tid=u.id,aids=uidtl(tid),s=sf(aids),mr=D.records.filter(function(r){return r.user_id===tid;}).sort(function(a,b){return b.date.localeCompare(a.date);}).slice(0,30),mbs=D.users.filter(function(x){return x.role==="team_member"&&x.parent_id===tid;}).map(function(m){var ms=sf([m.id]),tdr=D.records.find(function(r){return r.user_id===m.id&&r.date===t_;});return{id:m.id,name:m.name,username:m.username,leads:ms.leads,arrive:ms.arrive,orders:ms.orders,revenue:ms.revenue,monthLeads:ms.monthLeads,monthArrive:ms.monthArrive,monthOrders:ms.monthOrders,monthRevenue:ms.monthRevenue,today_record:tdr||null};}),tltr=D.records.filter(function(r){return r.date===t_&&aids.indexOf(r.user_id)>=0;}),wf={draft:tltr.filter(function(r){return r.status==="draft";}).length,confirmed:tltr.filter(function(r){return r.status==="confirmed";}).length,approved:tltr.filter(function(r){return r.status==="approved";}).length,rejected:tltr.filter(function(r){return r.status==="rejected";}).length};return[200,{role:"team_leader",name:u.name,stats:s,records:mr,members:mbs,prices:D.prices,workflow:wf}];}
+if(role==="team_member"){var mid=u.id,s=sf([mid]),mr2=D.records.filter(function(r){return r.user_id===mid;}).sort(function(a,b){return b.date.localeCompare(a.date);}).slice(0,30);return[200,{role:"team_member",name:u.name,stats:s,records:mr2,prices:D.prices}];}
+return[403,{error:"未知角色"}];}
+
+function postSupervisors(tk,b){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(u.role!=="boss")return[403,{error:"无权限"}];if(!b.name||!b.groupName||!b.username||!b.password)return[400,{error:"请填写所有字段"}];if(D.users.find(function(x){return x.username===b.username;}))return[400,{error:"账号已存在"}];var gid_=gid("g"),sid=gid("sup");D.groups.push({id:gid_,name:b.groupName,supervisor_id:sid,supervisor_name:b.name,created_at:ts()});D.users.push({id:sid,username:b.username,password:b.password,role:"supervisor",name:b.name,group_id:gid_,parent_id:null});sv();return[200,{ok:true,group_id:gid_,supervisor_id:sid}];}
+function postTL(tk,b){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(u.role!=="supervisor")return[403,{error:"无权限"}];if(!b.name||!b.username||!b.password)return[400,{error:"请填写所有字段"}];if(D.users.find(function(x){return x.username===b.username;}))return[400,{error:"账号已存在"}];var tid=gid("tl");D.users.push({id:tid,username:b.username,password:b.password,role:"team_leader",name:b.name,group_id:u.group_id,parent_id:null});sv();return[200,{ok:true,id:tid}];}
+function delTL(tk,id){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(u.role!=="supervisor")return[403,{error:"无权限"}];var tl=D.users.find(function(x){return x.id===id&&x.role==="team_leader"&&x.group_id===u.group_id;});if(!tl)return[404,{error:"组长不存在"}];D.users=D.users.filter(function(x){return x.parent_id!==tl.id;});D.users=D.users.filter(function(x){return x.id!==tl.id;});D.records=D.records.filter(function(r){return r.user_id!==tl.id;});sv();return[200,{ok:true}];}
+function postMember(tk,tid,b){var u=verify(tk);if(!u)return[401,{error:"未登录"}];var role=u.role;if(role==="team_leader"){if(tid!==u.id)return[403,{error:"只能添加自己的组员"}];}else if(role==="supervisor"){var tl=D.users.find(function(x){return x.id===tid&&x.group_id===u.group_id;});if(!tl)return[403,{error:"无权操作"}];}else{return[403,{error:"无权限"}];}if(!b.name||!b.username||!b.password)return[400,{error:"请填写所有字段"}];if(D.users.find(function(x){return x.username===b.username;}))return[400,{error:"账号已存在"}];var mid=gid("tm");D.users.push({id:mid,username:b.username,password:b.password,role:"team_member",name:b.name,group_id:u.group_id,parent_id:tid});sv();return[200,{ok:true,id:mid}];}
+function delMember(tk,mid){var u=verify(tk);if(!u)return[401,{error:"未登录"}];var m=D.users.find(function(x){return x.id===mid&&x.role==="team_member";});if(!m)return[404,{error:"组员不存在"}];var role=u.role;if(role==="team_leader"){if(m.parent_id!==u.id)return[403,{error:"无权操作"}];}else if(role==="supervisor"){var tl=D.users.find(function(x){return x.id===m.parent_id;});if(!tl||tl.group_id!==u.group_id)return[403,{error:"无权操作"}];}else{return[403,{error:"无权限"}];}D.users=D.users.filter(function(x){return x.id!==mid;});D.records=D.records.filter(function(r){return r.user_id!==mid;});sv();return[200,{ok:true}];}
+function postRecords(tk,b){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(!b.user_id||!b.date)return[400,{error:"缺少用户ID或日期"}];var role=u.role,tu=D.users.find(function(x){return x.id===b.user_id;});if(!tu)return[403,{error:"目标用户不存在"}];if(role==="boss")return[403,{error:"管理员不需要录入数据"}];else if(role==="supervisor"){if(tu.group_id!==u.group_id)return[403,{error:"无权操作该用户"}];}else if(role==="team_leader"){if(b.user_id!==u.id&&tu.parent_id!==u.id)return[403,{error:"只能录入自己或自己组员的数据"}];}else if(role==="team_member"){if(b.user_id!==u.id)return[403,{error:"只能录入自己的数据"}];}else{return[403,{error:"无权录入"}];}var ix=D.records.findIndex(function(r){return r.user_id===b.user_id&&r.date===b.date;}),is_=role==="supervisor"?"confirmed":"draft",rec={user_id:b.user_id,date:b.date,leads:Number(b.leads)||0,arrive:Number(b.arrive)||0,orders:Number(b.orders)||0,note:b.note||"",status:is_,updated_by:u.id,updated_at:new Date().toISOString()};if(ix>=0){rec.status=D.records[ix].status||is_;for(var k in rec)D.records[ix][k]=rec[k];}else{rec.id=gid("rec");rec.created_by=u.id;rec.created_at=new Date().toISOString();D.records.push(rec);}sv();return[200,{ok:true}];}
+function getRecords(tk,q){var u=verify(tk);if(!u)return[401,{error:"未登录"}];var role=u.role,recs=[];if(role==="boss")recs=D.records.slice();else if(role==="supervisor"){var ids=uidg(u.group_id);recs=D.records.filter(function(r){return ids.indexOf(r.user_id)>=0;});}else if(role==="team_leader"){var ids=uidtl(u.id);recs=D.records.filter(function(r){return ids.indexOf(r.user_id)>=0;});}else{recs=D.records.filter(function(r){return r.user_id===u.id;});}if(q.date)recs=recs.filter(function(r){return r.date===q.date;});if(q.start)recs=recs.filter(function(r){return r.date>=q.start;});if(q.end)recs=recs.filter(function(r){return r.date<=q.end;});recs=recs.map(function(r){var usr=D.users.find(function(x){return x.id===r.user_id;}),g_=usr?D.groups.find(function(x){return x.id===usr.group_id;}):null,r2={};for(var k in r)r2[k]=r[k];r2.user_name=usr?usr.name:"";r2.user_role=usr?usr.role:"";r2.group_name=g_?g_.name:"";r2.revenue=(r.arrive||0)*D.prices.arrive+(r.orders||0)*D.prices.order;return r2;});recs.sort(function(a,b){return b.date.localeCompare(a.date);});return[200,recs];}
+function postChangePwd(tk,b){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(!b.oldPwd||!b.newPwd)return[400,{error:"请填写旧密码和新密码"}];if(b.newPwd.length<6)return[400,{error:"新密码至少6位"}];var r=D.users.find(function(x){return x.id===u.id;});if(!r)return[401,{error:"用户不存在"}];if(r.password!==b.oldPwd)return[401,{error:"旧密码错误"}];r.password=b.newPwd;sv();return[200,{ok:true}];}
+function getGroups(tk){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(u.role!=="boss")return[403,{error:"无权限"}];return[200,D.groups.map(function(g){var r={};for(var k in g)r[k]=g[k];r.team_leader_count=D.users.filter(function(x){return x.role==="team_leader"&&x.group_id===g.id;}).length;return r;})];}
+function getAccounts(tk){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(u.role!=="boss")return[403,{error:"无权限"}];var ro={supervisor:0,team_leader:1,team_member:2},acs=D.users.filter(function(x){return x.role!=="boss";}).map(function(x){var g_=D.groups.find(function(gg){return gg.id===x.group_id;}),p=x.parent_id?D.users.find(function(pp){return pp.id===x.parent_id;}):null;return{id:x.id,name:x.name,username:x.username,role:x.role,group_id:x.group_id||"",group_name:g_?g_.name:"",parent_id:x.parent_id||"",parent_name:p?p.name:"",record_count:D.records.filter(function(r){return r.user_id===x.id;}).length,created_at:x.created_at||""};}).sort(function(a,b){return(ro[a.role]||99)-(ro[b.role]||99);});return[200,{accounts:acs,groups:D.groups.map(function(g){return{id:g.id,name:g.name,supervisor_name:g.supervisor_name};})}];}
+function postAdminTL(tk,b){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(u.role!=="boss")return[403,{error:"无权限"}];if(!b.name||!b.username||!b.password||!b.group_id)return[400,{error:"请填写所有字段"}];if(b.password.length<6)return[400,{error:"密码至少6位"}];if(D.users.find(function(x){return x.username===b.username;}))return[400,{error:"账号已存在"}];if(!D.groups.find(function(x){return x.id===b.group_id;}))return[400,{error:"组不存在"}];var tid=gid("tl");D.users.push({id:tid,username:b.username,password:b.password,role:"team_leader",name:b.name,group_id:b.group_id,parent_id:null,created_at:ts()});sv();return[200,{ok:true,id:tid}];}
+function postAdminTM(tk,b){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(u.role!=="boss")return[403,{error:"无权限"}];if(!b.name||!b.username||!b.password||!b.parent_id||!b.group_id)return[400,{error:"请填写所有字段"}];if(b.password.length<6)return[400,{error:"密码至少6位"}];if(D.users.find(function(x){return x.username===b.username;}))return[400,{error:"账号已存在"}];if(!D.users.find(function(x){return x.id===b.parent_id&&x.role==="team_leader";}))return[400,{error:"组长不存在"}];var mid=gid("tm");D.users.push({id:mid,username:b.username,password:b.password,role:"team_member",name:b.name,group_id:b.group_id,parent_id:b.parent_id,created_at:ts()});sv();return[200,{ok:true,id:mid}];}
+function delAccount(tk,id){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(u.role!=="boss")return[403,{error:"无权限"}];var t=D.users.find(function(x){return x.id===id;});if(!t)return[404,{error:"账号不存在"}];if(t.role==="boss")return[403,{error:"不能删除管理员账号"}];if(t.role==="supervisor"){var guids=D.users.filter(function(x){return x.group_id===t.group_id&&x.id!==t.id;}).map(function(x){return x.id;});D.records=D.records.filter(function(r){return guids.indexOf(r.user_id)<0;});D.users=D.users.filter(function(x){return x.group_id!==t.group_id||x.id===t.id;});D.groups=D.groups.filter(function(g){return g.id!==t.group_id;});}if(t.role==="team_leader"){var mids=D.users.filter(function(x){return x.parent_id===t.id;}).map(function(x){return x.id;});D.records=D.records.filter(function(r){return mids.indexOf(r.user_id)<0;});D.users=D.users.filter(function(x){return x.parent_id!==t.id;});}D.records=D.records.filter(function(r){return r.user_id!==t.id;});D.users=D.users.filter(function(x){return x.id!==t.id;});sv();return[200,{ok:true}];}
+function resetPwd(tk,id,b){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(u.role!=="boss")return[403,{error:"无权限"}];var t=D.users.find(function(x){return x.id===id;});if(!t)return[404,{error:"账号不存在"}];if(!b.password||b.password.length<6)return[400,{error:"密码至少6位"}];t.password=b.password;sv();return[200,{ok:true}];}
+function recAction(tk,id,action,b){var u=verify(tk);if(!u)return[401,{error:"未登录"}];var rec=D.records.find(function(r){return r.id===id;});if(!rec)return[404,{error:"记录不存在"}];var tu=D.users.find(function(x){return x.id===rec.user_id;});if(!tu)return[404,{error:"用户不存在"}];var role=u.role;if(action==="confirm"){if(role==="team_leader"){if(rec.user_id!==u.id&&tu.parent_id!==u.id)return[403,{error:"无权操作"}];}else if(role==="supervisor"){if(tu.group_id!==u.group_id)return[403,{error:"无权操作"}];}else{return[403,{error:"无权限"}];}rec.status="confirmed";rec.confirmed_by=u.id;}else if(action==="approve"){if(role==="supervisor"){if(tu.group_id!==u.group_id)return[403,{error:"无权操作"}];}else if(role!=="boss")return[403,{error:"无权限"}];rec.status="approved";rec.approved_by=u.id;}else if(action==="reject"){if(role==="supervisor"){if(tu.group_id!==u.group_id)return[403,{error:"无权操作"}];}else if(role!=="boss")return[403,{error:"无权限"}];rec.status="rejected";rec.rejected_by=u.id;rec.reject_reason=(b&&b.reason)||"";}sv();return[200,{ok:true}];}
+function getPrices(){return[200,{arrive:D.prices.arrive,order:D.prices.order}];}
+function putPrices(tk,b){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(u.role!=="boss")return[403,{error:"无权限"}];D.prices.arrive=Number(b.arrive)||300;D.prices.order=Number(b.order)||800;sv();return[200,{ok:true,arrive:D.prices.arrive,order:D.prices.order}];}
+function getHrStats(){return[200,D.hr_stats||{}];}
+function putHrStats(tk,b){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(u.role!=="boss"&&u.role!=="supervisor"&&u.role!=="team_leader")return[403,{error:"无权限"}];D.hr_stats={active_count:Number(b.active_count)||0,attendance_today:Number(b.attendance_today)||0,hiring_positions:Number(b.hiring_positions)||0,monthly_turnover_rate:Number(b.monthly_turnover_rate)||0,updated_at:new Date().toISOString(),updated_by:u.id};sv();return[200,{ok:true,hr_stats:D.hr_stats}];}
+function getMobile(){return[200,D.mobile_assets||{}];}
+function putMobile(tk,b){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(u.role!=="boss"&&u.role!=="supervisor")return[403,{error:"无权限"}];D.mobile_assets={total:Number(b.total)||0,in_use:Number(b.in_use)||0,idle:Number(b.idle)||0,accounts_preparing:Number(b.accounts_preparing)||0,updated_at:new Date().toISOString(),updated_by:u.id};sv();return[200,{ok:true,mobile_assets:D.mobile_assets}];}
+function getDisease(){return[200,D.disease_stats||{}];}
+function putDisease(tk,b){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(u.role!=="boss"&&u.role!=="supervisor")return[403,{error:"无权限"}];D.disease_stats={vitiligo:Number(b.vitiligo)||0,psoriasis:Number(b.psoriasis)||0,dermatitis:Number(b.dermatitis)||0,updated_at:new Date().toISOString(),updated_by:u.id};sv();return[200,{ok:true,disease_stats:D.disease_stats}];}
+function getTodos(){return[200,D.todos||[]];}
+function postTodo(tk,b){var u=verify(tk);if(!u)return[401,{error:"未登录"}];var todo={id:gid("todo"),title:b.title||"",desc:b.desc||"",priority:b.priority||"normal",deadline:b.deadline||"",done:false,created_by:u.id,created_at:new Date().toISOString()};D.todos.push(todo);sv();return[200,{ok:true,todo:todo}];}
+function putTodo(id,b){var t=D.todos.find(function(x){return x.id===id;});if(!t)return[404,{error:"待办不存在"}];if(b.title!==undefined)t.title=b.title;if(b.desc!==undefined)t.desc=b.desc;if(b.priority!==undefined)t.priority=b.priority;if(b.deadline!==undefined)t.deadline=b.deadline;if(b.done!==undefined)t.done=b.done;sv();return[200,{ok:true,todo:t}];}
+function delTodo(id){D.todos=D.todos.filter(function(x){return x.id!==id;});sv();return[200,{ok:true}];}
+
+function route(method,path,tk,body,q){
+var pp=path.split("/");
+if(path==="/api/login"&&method==="POST")return postLogin(body);
+if(path==="/api/me"&&method==="GET")return getMe(tk);
+if(path==="/api/dashboard"&&method==="GET")return getDashboard(tk);
+if(path==="/api/prices"&&method==="GET")return getPrices();
+if(path==="/api/prices"&&method==="PUT")return putPrices(tk,body);
+if(path==="/api/supervisors"&&method==="POST")return postSupervisors(tk,body);
+if(path==="/api/team-leaders"&&method==="POST")return postTL(tk,body);
+if(path==="/api/records"&&method==="POST")return postRecords(tk,body);
+if(path==="/api/records"&&method==="GET")return getRecords(tk,q);
+if(path==="/api/change_pwd"&&method==="POST")return postChangePwd(tk,body);
+if(path==="/api/groups"&&method==="GET")return getGroups(tk);
+if(path==="/api/accounts"&&method==="GET")return getAccounts(tk);
+if(path==="/api/hr-stats"&&method==="GET")return getHrStats();
+if(path==="/api/hr-stats"&&method==="PUT")return putHrStats(tk,body);
+if(path==="/api/mobile-assets"&&method==="GET")return getMobile();
+if(path==="/api/mobile-assets"&&method==="PUT")return putMobile(tk,body);
+if(path==="/api/disease-stats"&&method==="GET")return getDisease();
+if(path==="/api/disease-stats"&&method==="PUT")return putDisease(tk,body);
+if(path==="/api/todos"&&method==="GET")return getTodos();
+if(path==="/api/todos"&&method==="POST")return postTodo(tk,body);
+if(path==="/api/yesterday-summary"&&method==="GET")return getYesterday();
+if(path==="/api/trends"&&method==="GET")return getTrends(tk,q);
+if(path==="/api/admin/team-leaders"&&method==="POST")return postAdminTL(tk,body);
+if(path==="/api/admin/team-members"&&method==="POST")return postAdminTM(tk,body);
+if(pp[1]==="api"){
+if(pp[2]==="team-leaders"&&pp.length===4&&method==="DELETE")return delTL(tk,pp[3]);
+if(pp[2]==="team-leaders"&&pp.length===5&&pp[4]==="members"&&method==="POST")return postMember(tk,pp[3],body);
+if(pp[2]==="team-members"&&pp.length===4&&method==="DELETE")return delMember(tk,pp[3]);
+if(pp[2]==="groups"&&pp.length===5&&pp[4]==="team-leaders"&&method==="GET")return getGroupTLs(tk,pp[3]);
+if(pp[2]==="users"&&pp.length===5&&pp[4]==="detail"&&method==="GET")return getUserDetail(tk,pp[3]);
+if(pp[2]==="accounts"&&pp.length===4&&method==="DELETE")return delAccount(tk,pp[3]);
+if(pp[2]==="accounts"&&pp.length===5&&pp[4]==="reset-password"&&method==="POST")return resetPwd(tk,pp[3],body);
+if(pp[2]==="records"&&pp.length===5&&["confirm","approve","reject"].indexOf(pp[4])>=0&&method==="POST")return recAction(tk,pp[3],pp[4],body);
+if(pp[2]==="todos"&&pp.length===4&&method==="PUT")return putTodo(pp[3],body);
+if(pp[2]==="todos"&&pp.length===4&&method==="DELETE")return delTodo(pp[3]);
+}
+return[404,{error:"Not found"}];
 }
 
-var D = (function() {
-  try { var r = localStorage.getItem(LK); return r ? JSON.parse(r) : def(); }
-  catch(e) { return def(); }
-})();
+function getYesterday(){var u=verify(getTokenFromHeaders());if(!u){var t=new Date();t.setDate(t.getDate()-1);return[200,{yesterday_date:t.toISOString().slice(0,10),groups:[],total:{},prices:D.prices}];}
+var y=new Date();y.setDate(y.getDate()-1);var ys_=y.toISOString().slice(0,10);y.setDate(y.getDate()-1);var ds=y.toISOString().slice(0,10);var au=D.users.filter(function(x){return x.role==="team_leader"||x.role==="team_member";}).map(function(x){return x.id;}),yTotal=sfd(au,ys_),dbTotal=sfd(au,ds);var ar_=function(c,p){var pv=p===0?(c>0?100:0):Math.round(((c-p)/p)*1000)/10;return{dir:pv>0?"up":pv<0?"down":"flat",pct:Math.abs(pv)};};var gs=D.groups.map(function(g){var ids=uidg(g.id),yStat=sfd(ids,ys_),dbStat=sfd(ids,ds);return{id:g.id,name:g.name,supervisor_name:g.supervisor_name,yesterday:yStat,day_before:dbStat,arrows:{leads:ar_(yStat.leads,dbStat.leads),arrive:ar_(yStat.arrive,dbStat.arrive),orders:ar_(yStat.orders,dbStat.orders),revenue:ar_(yStat.revenue,dbStat.revenue)}};});gs.sort(function(a,b){return b.yesterday.revenue-a.yesterday.revenue;});var tg=null,tl=null;gs.forEach(function(g){if(g.arrows.revenue.dir==="up"){if(!tg||g.arrows.revenue.pct>tg.arrows.revenue.pct)tg=g;}if(g.arrows.revenue.dir==="down"){if(!tl||g.arrows.revenue.pct>tl.arrows.revenue.pct)tl=g;}});return[200,{yesterday_date:ys_,day_before_date:ds,total:yTotal,total_prev:dbTotal,total_arrows:{leads:ar_(yTotal.leads,dbTotal.leads),arrive:ar_(yTotal.arrive,dbTotal.arrive),orders:ar_(yTotal.orders,dbTotal.orders),revenue:ar_(yTotal.revenue,dbTotal.revenue)},groups:gs,top_gainer:tg,top_loser:tl,prices:D.prices}];}
+function getTokenFromHeaders(){return"";}
 
-function sv() { try { localStorage.setItem(LK, JSON.stringify(D)); } catch(e) {} }
-function gid(p) { return p + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
-function ts() { var d = new Date(); var p = function(n) { return String(n).padStart(2, "0"); }; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); }
-function ys() { var d = new Date(); d.setDate(d.getDate() - 1); var p = function(n) { return String(n).padStart(2, "0"); }; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); }
-function db2() { var d = new Date(); d.setDate(d.getDate() - 2); var p = function(n) { return String(n).padStart(2, "0"); }; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); }
+function getTrends(tk,q){var u=verify(tk);if(!u)return[401,{error:"未登录"}];var t_=ts(),mo=q.month||t_.slice(0,7),uf=q.user_id,role=u.role,ids=[];if(role==="boss"){ids=D.users.filter(function(x){return x.role==="team_leader"||x.role==="team_member";}).map(function(x){return x.id;});if(uf)ids=[uf];}else if(role==="supervisor"){ids=uidg(u.group_id);if(uf)ids=[uf];}else if(role==="team_leader"){ids=uidtl(u.id);if(uf)ids=[uf];}else{ids=[u.id];}var recs=D.records.filter(function(r){return ids.indexOf(r.user_id)>=0;});function bmd(ym){var p_=ym.split("-").map(Number),dim=new Date(p_[0],p_[1],0).getDate(),dy=[];for(var d=1;d<=dim;d++){var ds=ym+"-"+String(d).padStart(2,"0"),drs=recs.filter(function(r){return r.date===ds;}),l2=0,a2=0,o2=0,r2=0;drs.forEach(function(r){l2+=r.leads||0;a2+=r.arrive||0;o2+=r.orders||0;r2+=(r.arrive||0)*D.prices.arrive+(r.orders||0)*D.prices.order;});dy.push({date:ds,day:d,leads:l2,arrive:a2,orders:o2,revenue:r2});}var ac=dy.filter(function(d){return d.leads||d.arrive||d.orders;}),tt={leads:dy.reduce(function(s,d){return s+d.leads;},0),arrive:dy.reduce(function(s,d){return s+d.arrive;},0),orders:dy.reduce(function(s,d){return s+d.orders;},0),revenue:dy.reduce(function(s,d){return s+d.revenue;},0),days:ac.length};return{daily:dy,total:tt};}var cur=bmd(mo),p2=mo.split("-").map(Number),pym=p2[1]===1?(p2[0]-1)+"-12":p2[0]+"-"+String(p2[1]-1).padStart(2,"0"),prev=bmd(pym);function pc(c,p){if(p===0)return c>0?100:0;return Math.round(((c-p)/p)*1000)/10;}function to(c,p){var v=pc(c,p);return{pct:v,direction:v>=0?"up":"down"};}var trs={leads:to(cur.total.leads,prev.total.leads),arrive:to(cur.total.arrive,prev.total.arrive),orders:to(cur.total.orders,prev.total.orders),revenue:to(cur.total.revenue,prev.total.revenue)},h=Math.floor(cur.daily.length/2),f_=cur.daily.slice(0,h),s2=cur.daily.slice(h),wm={};["leads","arrive","orders","revenue"].forEach(function(m){var fh=f_.reduce(function(s,d){return s+d[m];},0),sh=s2.reduce(function(s,d){return s+d[m];},0);wm[m]=to(sh,fh);});return[200,{month:mo,prev_month:pym,daily:cur.daily,month_total:cur.total,prev_month_total:prev.total,trends:trs,within_month:wm,prices:D.prices}];}
+function getGroupTLs(tk,gid_){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(u.role!=="boss")return[403,{error:"无权限"}];var g=D.groups.find(function(x){return x.id===gid_;});if(!g)return[404,{error:"组不存在"}];var t_=ts(),tls_=D.users.filter(function(x){return x.role==="team_leader"&&x.group_id===g.id;}).map(function(tl){var mids=D.users.filter(function(x){return x.role==="team_member"&&x.parent_id===tl.id;}).map(function(m){return m.id;}),aids=[tl.id].concat(mids),s=sf(aids),tdr=D.records.find(function(r){return r.user_id===tl.id&&r.date===t_;}),mbs_=D.users.filter(function(x){return x.role==="team_member"&&x.parent_id===tl.id;}).map(function(m){var ms=sf([m.id]),mtdr=D.records.find(function(r){return r.user_id===m.id&&r.date===t_;});return{id:m.id,name:m.name,username:m.username,leads:ms.leads,arrive:ms.arrive,orders:ms.orders,revenue:ms.revenue,monthLeads:ms.monthLeads,monthArrive:ms.monthArrive,monthOrders:ms.monthOrders,monthRevenue:ms.monthRevenue,today_record:mtdr||null};});return{id:tl.id,name:tl.name,username:tl.username,leads:s.leads,arrive:s.arrive,orders:s.orders,revenue:s.revenue,monthLeads:s.monthLeads,monthArrive:s.monthArrive,monthOrders:s.monthOrders,monthRevenue:s.monthRevenue,today_record:tdr||null,member_count:mids.length,members:mbs_};});return[200,{group:{id:g.id,name:g.name,supervisor_name:g.supervisor_name},team_leaders:tls_,prices:D.prices}];}
+function getUserDetail(tk,tid){var u=verify(tk);if(!u)return[401,{error:"未登录"}];var t=D.users.find(function(x){return x.id===tid;});if(!t)return[404,{error:"用户不存在"}];var role=u.role;if(role==="supervisor"){if(t.group_id!==u.group_id)return[403,{error:"无权查看"}];}else if(role==="team_leader"){if(tid!==u.id&&t.parent_id!==u.id)return[403,{error:"无权查看"}];}else if(role==="team_member"){if(tid!==u.id)return[403,{error:"无权查看"}];}else{return[403,{error:"无权限"}];}var g=D.groups.find(function(x){return x.id===t.group_id;}),t_=ts(),mp_=t_.slice(0,7),ars=D.records.filter(function(r){return r.user_id===tid;}).sort(function(a,b){return b.date.localeCompare(a.date);}),tdr=ars.find(function(r){return r.date===t_;})||null,mrs=ars.filter(function(r){return r.date.slice(0,7)===mp_;}),ml=0,ma=0,mo=0,mr=0;mrs.forEach(function(x){ml+=x.leads||0;ma+=x.arrive||0;mo+=x.orders||0;mr+=(x.arrive||0)*D.prices.arrive+(x.orders||0)*D.prices.order;});return[200,{user:{id:t.id,name:t.name,username:t.username,role:t.role},group:g?{id:g.id,name:g.name,supervisor_name:g.supervisor_name}:null,today_record:tdr,today_date:t_,month_stats:{leads:ml,arrive:ma,orders:mo,revenue:mr,days:mrs.length},recent_records:ars.slice(0,14),prices:D.prices}];}
 
-function uidg(gid) {
-  var t = D.users.filter(function(u) { return u.role === "team_leader" && u.group_id === gid; }).map(function(x) { return x.id; });
-  var m = D.users.filter(function(u) { return u.role === "team_member" && t.indexOf(u.parent_id) >= 0; });
-  return t.concat(m.map(function(x) { return x.id; }));
+var _of=window.fetch;
+window.fetch=function(url,opts){
+var us=(typeof url==="string")?url:(url.url||url.toString());
+if(us.indexOf("/api/")>=0){
+var m=(opts&&opts.method)||"GET",tk="";
+if(opts&&opts.headers){var ah=opts.headers.Authorization||opts.headers.authorization||"";if(ah.indexOf("Bearer ")===0)tk=ah.slice(7);}
+var body={};try{if(opts&&opts.body)body=JSON.parse(opts.body);}catch(e){}
+var up=us,q={};
+if(us.indexOf("?")>0){var pa=us.split("?");up=pa[0];pa[1].split("&").forEach(function(p_){var kv=p_.split("=");if(kv.length===2)q[kv[0]]=decodeURIComponent(kv[1]);});}
+var result=route(m,up,tk,body,q);
+return Promise.resolve(new Response(JSON.stringify(result[1]),{status:result[0],headers:{"Content-Type":"application/json"}}));
 }
-
-function uidtl(tid) {
-  var m = D.users.filter(function(u) { return u.role === "team_member" && u.parent_id === tid; });
-  return [tid].concat(m.map(function(x) { return x.id; }));
-}
-
-function sf(ids) {
-  var t = ts(), mp = t.slice(0, 7);
-  var l = 0, a = 0, o = 0, r = 0, ml = 0, ma = 0, mo = 0, mr = 0;
-  ids.forEach(function(id) {
-    D.records.filter(function(rec) { return rec.user_id === id; }).forEach(function(rec) {
-      var rev = (rec.arrive || 0) * D.prices.arrive + (rec.orders || 0) * D.prices.order;
-      if (rec.date === t) { l += rec.leads || 0; a += rec.arrive || 0; o += rec.orders || 0; r += rev; }
-      if (rec.date.slice(0, 7) === mp) { ml += rec.leads || 0; ma += rec.arrive || 0; mo += rec.orders || 0; mr += rev; }
-    });
-  });
-  return { leads: l, arrive: a, orders: o, revenue: r, monthLeads: ml, monthArrive: ma, monthOrders: mo, monthRevenue: mr };
-}
-
-function sfd(ids, ds) {
-  var l = 0, a = 0, o = 0, r = 0;
-  ids.forEach(function(id) {
-    D.records.filter(function(rec) { return rec.user_id === id && rec.date === ds; }).forEach(function(rec) {
-      l += rec.leads || 0; a += rec.arrive || 0; o += rec.orders || 0;
-      r += (rec.arrive || 0) * D.prices.arrive + (rec.orders || 0) * D.prices.order;
-    });
-  });
-  return { leads: l, arrive: a, orders: o, revenue: r };
-}
-
-function sign(u) {
-  var p = JSON.stringify({ id: u.id, role: u.role, name: u.name, group_id: u.group_id, parent_id: u.parent_id });
-  return ubtoa(p) + "." + ubtoa("sig_" + u.id);
-}
-
-function verify(tk) {
-  if (!tk) return null;
-  var parts = tk.split(".");
-  if (parts.length !== 2) return null;
-  try { return JSON.parse(uatob(parts[0])); } catch(e) { return null; }
-}
-
-function extractUser(tk) { return verify(tk); }
-
-function authFail() { return [401, { error: "未登录或登录已过期" }]; }
-
-// ============ Route Handlers ============
-
-function postLogin(body) {
-  if (!body.username || !body.password) return [400, { error: "请输入账号和密码" }];
-  var u = D.users.find(function(x) { return x.username === body.username; });
-  if (!u) return [401, { error: "账号不存在" }];
-  if (u.password !== body.password) return [401, { error: "密码错误" }];
-  var user = { id: u.id, role: u.role, name: u.name, group_id: u.group_id, parent_id: u.parent_id };
-  return [200, { token: sign(user), user: user }];
-}
-
-function getMe(tk) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  var r = D.users.find(function(x) { return x.id === u.id; });
-  if (!r) return [401, { error: "用户不存在" }];
-  return [200, { user: { id: r.id, role: r.role, name: r.name, group_id: r.group_id, parent_id: r.parent_id } }];
-}
-
-function arrow(c, p) {
-  if (p === 0 && c > 0) return { dir: "up", pct: 100 };
-  if (p === 0 && c === 0) return { dir: "flat", pct: 0 };
-  var v = Math.round(((c - p) / p) * 1000) / 10;
-  return { dir: v > 0 ? "up" : v < 0 ? "down" : "flat", pct: Math.abs(v) };
-}
-
-function getDashboard(tk) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  var role = u.role, today = ts();
-
-  if (role === "boss") {
-    var y = ys();
-    var groups = D.groups.map(function(g) {
-      var ids = uidg(g.id), s = sf(ids), yStat = sfd(ids, y);
-      var tls = D.users.filter(function(x) { return x.role === "team_leader" && x.group_id === g.id; });
-      return {
-        id: g.id, name: g.name, supervisor_name: g.supervisor_name,
-        team_leader_count: tls.length,
-        leads: s.leads, arrive: s.arrive, orders: s.orders, revenue: s.revenue,
-        monthLeads: s.monthLeads, monthArrive: s.monthArrive, monthOrders: s.monthOrders, monthRevenue: s.monthRevenue,
-        yesterday: yStat,
-        arrows: {
-          leads: arrow(s.leads, yStat.leads),
-          arrive: arrow(s.arrive, yStat.arrive),
-          orders: arrow(s.orders, yStat.orders),
-          revenue: arrow(s.revenue, yStat.revenue)
-        }
-      };
-    });
-    var todayRecs = D.records.filter(function(r) { return r.date === today; });
-    var workflow = {
-      draft: todayRecs.filter(function(r) { return r.status === "draft"; }).length,
-      confirmed: todayRecs.filter(function(r) { return r.status === "confirmed"; }).length,
-      approved: todayRecs.filter(function(r) { return r.status === "approved"; }).length,
-      rejected: todayRecs.filter(function(r) { return r.status === "rejected"; }).length,
-      total: todayRecs.length
-    };
-    return [200, { role: "boss", groups: groups, prices: D.prices, hr_stats: D.hr_stats || {}, mobile_assets: D.mobile_assets || {}, disease_stats: D.disease_stats || {}, todos: D.todos || [], workflow: workflow }];
-  }
-
-  if (role === "supervisor") {
-    var gid = u.group_id;
-    var g = D.groups.find(function(x) { return x.id === gid; });
-    if (!g) return [200, { role: "supervisor", group: null, team_leaders: [], total: {}, prices: D.prices }];
-    var tls = D.users.filter(function(x) { return x.role === "team_leader" && x.group_id === gid; }).map(function(tl) {
-      var mids = D.users.filter(function(x) { return x.role === "team_member" && x.parent_id === tl.id; }).map(function(m) { return m.id; });
-      var allIds = [tl.id].concat(mids), s = sf(allIds);
-      var tdr = D.records.find(function(r) { return r.user_id === tl.id && r.date === today; });
-      return { id: tl.id, name: tl.name, username: tl.username, leads: s.leads, arrive: s.arrive, orders: s.orders, revenue: s.revenue, monthLeads: s.monthLeads, monthArrive: s.monthArrive, monthOrders: s.monthOrders, monthRevenue: s.monthRevenue, today_record: tdr || null, member_count: mids.length };
-    });
-    var allIds = uidg(gid), total = sf(allIds);
-    var guids = uidg(gid), tgr = D.records.filter(function(r) { return r.date === today && guids.indexOf(r.user_id) >= 0; });
-    var workflow = {
-      draft: tgr.filter(function(r) { return r.status === "draft"; }).length,
-      confirmed: tgr.filter(function(r) { return r.status === "confirmed"; }).length,
-      approved: tgr.filter(function(r) { return r.status === "approved"; }).length,
-      rejected: tgr.filter(function(r) { return r.status === "rejected"; }).length
-    };
-    return [200, { role: "supervisor", group: { id: g.id, name: g.name }, team_leaders: tls, total: total, prices: D.prices, workflow: workflow }];
-  }
-
-  if (role === "team_leader") {
-    var tlId = u.id, allIds = uidtl(tlId), s = sf(allIds);
-    var myRecords = D.records.filter(function(r) { return r.user_id === tlId; }).sort(function(a, b) { return b.date.localeCompare(a.date); }).slice(0, 30);
-    var members = D.users.filter(function(x) { return x.role === "team_member" && x.parent_id === tlId; }).map(function(m) {
-      var ms = sf([m.id]);
-      var tdr = D.records.find(function(r) { return r.user_id === m.id && r.date === today; });
-      return { id: m.id, name: m.name, username: m.username, leads: ms.leads, arrive: ms.arrive, orders: ms.orders, revenue: ms.revenue, monthLeads: ms.monthLeads, monthArrive: ms.monthArrive, monthOrders: ms.monthOrders, monthRevenue: ms.monthRevenue, today_record: tdr || null };
-    });
-    var tlTodayRecs = D.records.filter(function(r) { return r.date === today && allIds.indexOf(r.user_id) >= 0; });
-    var workflow = {
-      draft: tlTodayRecs.filter(function(r) { return r.status === "draft"; }).length,
-      confirmed: tlTodayRecs.filter(function(r) { return r.status === "confirmed"; }).length,
-      approved: tlTodayRecs.filter(function(r) { return r.status === "approved"; }).length,
-      rejected: tlTodayRecs.filter(function(r) { return r.status === "rejected"; }).length
-    };
-    return [200, { role: "team_leader", name: u.name, stats: s, records: myRecords, members: members, prices: D.prices, workflow: workflow }];
-  }
-
-  if (role === "team_member") {
-    var mId = u.id, s = sf([mId]);
-    var myRecords = D.records.filter(function(r) { return r.user_id === mId; }).sort(function(a, b) { return b.date.localeCompare(a.date); }).slice(0, 30);
-    return [200, { role: "team_member", name: u.name, stats: s, records: myRecords, prices: D.prices }];
-  }
-
-  return [403, { error: "未知角色" }];
-}
-
-function getPrices() { return [200, { arrive: D.prices.arrive, order: D.prices.order }]; }
-
-function putPrices(tk, body) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  if (u.role !== "boss") return [403, { error: "无权限" }];
-  D.prices.arrive = Number(body.arrive) || 300;
-  D.prices.order = Number(body.order) || 800;
-  sv();
-  return [200, { ok: true, arrive: D.prices.arrive, order: D.prices.order }];
-}
-
-function postSupervisors(tk, body) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  if (u.role !== "boss") return [403, { error: "无权限" }];
-  if (!body.name || !body.groupName || !body.username || !body.password) return [400, { error: "请填写所有字段" }];
-  if (D.users.find(function(x) { return x.username === body.username; })) return [400, { error: "账号已存在" }];
-  var groupId = gid("g"), supId = gid("sup");
-  D.groups.push({ id: groupId, name: body.groupName, supervisor_id: supId, supervisor_name: body.name, created_at: ts() });
-  D.users.push({ id: supId, username: body.username, password: body.password, role: "supervisor", name: body.name, group_id: groupId, parent_id: null });
-  sv();
-  return [200, { ok: true, group_id: groupId, supervisor_id: supId }];
-}
-
-function postTeamLeaders(tk, body) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  if (u.role !== "supervisor") return [403, { error: "无权限" }];
-  if (!body.name || !body.username || !body.password) return [400, { error: "请填写所有字段" }];
-  if (D.users.find(function(x) { return x.username === body.username; })) return [400, { error: "账号已存在" }];
-  var tlId = gid("tl");
-  D.users.push({ id: tlId, username: body.username, password: body.password, role: "team_leader", name: body.name, group_id: u.group_id, parent_id: null });
-  sv();
-  return [200, { ok: true, id: tlId }];
-}
-
-function deleteTeamLeader(tk, id) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  if (u.role !== "supervisor") return [403, { error: "无权限" }];
-  var tl = D.users.find(function(x) { return x.id === id && x.role === "team_leader" && x.group_id === u.group_id; });
-  if (!tl) return [404, { error: "组长不存在" }];
-  D.users = D.users.filter(function(x) { return x.parent_id !== tl.id; });
-  D.users = D.users.filter(function(x) { return x.id !== tl.id; });
-  D.records = D.records.filter(function(r) { return r.user_id !== tl.id; });
-  sv();
-  return [200, { ok: true }];
-}
-
-function postMember(tk, tlId, body) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  var role = u.role;
-  if (role === "team_leader") {
-    if (tlId !== u.id) return [403, { error: "只能添加自己的组员" }];
-  } else if (role === "supervisor") {
-    var tl = D.users.find(function(x) { return x.id === tlId && x.group_id === u.group_id; });
-    if (!tl) return [403, { error: "无权操作" }];
-  } else {
-    return [403, { error: "无权限" }];
-  }
-  if (!body.name || !body.username || !body.password) return [400, { error: "请填写所有字段" }];
-  if (D.users.find(function(x) { return x.username === body.username; })) return [400, { error: "账号已存在" }];
-  var mId = gid("tm");
-  D.users.push({ id: mId, username: body.username, password: body.password, role: "team_member", name: body.name, group_id: u.group_id, parent_id: tlId });
-  sv();
-  return [200, { ok: true, id: mId }];
-}
-
-function deleteMember(tk, mId) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  var m = D.users.find(function(x) { return x.id === mId && x.role === "team_member"; });
-  if (!m) return [404, { error: "组员不存在" }];
-  var role = u.role;
-  if (role === "team_leader") {
-    if (m.parent_id !== u.id) return [403, { error: "无权操作" }];
-  } else if (role === "supervisor") {
-    var tl = D.users.find(function(x) { return x.id === m.parent_id; });
-    if (!tl || tl.group_id !== u.group_id) return [403, { error: "无权操作" }];
-  } else { return [403, { error: "无权限" }]; }
-  D.users = D.users.filter(function(x) { return x.id !== mId; });
-  D.records = D.records.filter(function(r) { return r.user_id !== mId; });
-  sv();
-  return [200, { ok: true }];
-}
-
-function postRecords(tk, body) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  if (!body.user_id || !body.date) return [400, { error: "缺少用户ID或日期" }];
-  var role = u.role, tu = D.users.find(function(x) { return x.id === body.user_id; });
-  if (!tu) return [403, { error: "目标用户不存在" }];
-  if (role === "boss") return [403, { error: "管理员不需要录入数据" }];
-  else if (role === "supervisor") {
-    if (tu.group_id !== u.group_id) return [403, { error: "无权操作该用户" }];
-  } else if (role === "team_leader") {
-    if (body.user_id !== u.id && tu.parent_id !== u.id) return [403, { error: "只能录入自己或自己组员的数据" }];
-  } else if (role === "team_member") {
-    if (body.user_id !== u.id) return [403, { error: "只能录入自己的数据" }];
-  } else { return [403, { error: "无权录入" }]; }
-
-  var ix = D.records.findIndex(function(r) { return r.user_id === body.user_id && r.date === body.date; });
-  var is = role === "supervisor" ? "confirmed" : "draft";
-  var rec = {
-    user_id: body.user_id, date: body.date,
-    leads: Number(body.leads) || 0, arrive: Number(body.arrive) || 0,
-    orders: Number(body.orders) || 0, note: body.note || "",
-    status: is, updated_by: u.id, updated_at: new Date().toISOString()
-  };
-  if (ix >= 0) {
-    rec.status = D.records[ix].status || is;
-    for (var k in rec) { D.records[ix][k] = rec[k]; }
-  } else {
-    rec.id = gid("rec");
-    rec.created_by = u.id;
-    rec.created_at = new Date().toISOString();
-    D.records.push(rec);
-  }
-  sv();
-  return [200, { ok: true }];
-}
-
-function getRecords(tk, q) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  var role = u.role, recs = [];
-  if (role === "boss") recs = D.records.slice();
-  else if (role === "supervisor") {
-    var ids = uidg(u.group_id);
-    recs = D.records.filter(function(r) { return ids.indexOf(r.user_id) >= 0; });
-  } else if (role === "team_leader") {
-    var ids = uidtl(u.id);
-    recs = D.records.filter(function(r) { return ids.indexOf(r.user_id) >= 0; });
-  } else { recs = D.records.filter(function(r) { return r.user_id === u.id; }); }
-
-  if (q.date) recs = recs.filter(function(r) { return r.date === q.date; });
-  if (q.start) recs = recs.filter(function(r) { return r.date >= q.start; });
-  if (q.end) recs = recs.filter(function(r) { return r.date <= q.end; });
-  recs = recs.map(function(r) {
-    var usr = D.users.find(function(x) { return x.id === r.user_id; });
-    var g = usr ? D.groups.find(function(x) { return x.id === usr.group_id; }) : null;
-    var r2 = {};
-    for (var k in r) { r2[k] = r[k]; }
-    r2.user_name = usr ? usr.name : "";
-    r2.user_role = usr ? usr.role : "";
-    r2.group_name = g ? g.name : "";
-    r2.revenue = (r.arrive || 0) * D.prices.arrive + (r.orders || 0) * D.prices.order;
-    return r2;
-  });
-  recs.sort(function(a, b) { return b.date.localeCompare(a.date); });
-  return [200, recs];
-}
-
-function postChangePwd(tk, body) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  if (!body.oldPwd || !body.newPwd) return [400, { error: "请填写旧密码和新密码" }];
-  if (body.newPwd.length < 6) return [400, { error: "新密码至少6位" }];
-  var r = D.users.find(function(x) { return x.id === u.id; });
-  if (!r) return [401, { error: "用户不存在" }];
-  if (r.password !== body.oldPwd) return [401, { error: "旧密码错误" }];
-  r.password = body.newPwd;
-  sv();
-  return [200, { ok: true }];
-}
-
-function getGroups(tk) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  if (u.role !== "boss") return [403, { error: "无权限" }];
-  var groups = D.groups.map(function(g) {
-    var tls = D.users.filter(function(x) { return x.role === "team_leader" && x.group_id === g.id; });
-    var r = {};
-    for (var k in g) { r[k] = g[k]; }
-    r.team_leader_count = tls.length;
-    return r;
-  });
-  return [200, groups];
-}
-
-function getGroupTLs(tk, gid) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  if (u.role !== "boss") return [403, { error: "无权限" }];
-  var g = D.groups.find(function(x) { return x.id === gid; });
-  if (!g) return [404, { error: "组不存在" }];
-  var today = ts();
-  var tls = D.users.filter(function(x) { return x.role === "team_leader" && x.group_id === g.id; }).map(function(tl) {
-    var mids = D.users.filter(function(x) { return x.role === "team_member" && x.parent_id === tl.id; }).map(function(m) { return m.id; });
-    var allIds = [tl.id].concat(mids), s = sf(allIds);
-    var tdr = D.records.find(function(r) { return r.user_id === tl.id && r.date === today; });
-    var members = D.users.filter(function(x) { return x.role === "team_member" && x.parent_id === tl.id; }).map(function(m) {
-      var ms = sf([m.id]);
-      var mtdr = D.records.find(function(r) { return r.user_id === m.id && r.date === today; });
-      return { id: m.id, name: m.name, username: m.username, leads: ms.leads, arrive: ms.arrive, orders: ms.orders, revenue: ms.revenue, monthLeads: ms.monthLeads, monthArrive: ms.monthArrive, monthOrders: ms.monthOrders, monthRevenue: ms.monthRevenue, today_record: mtdr || null };
-    });
-    return { id: tl.id, name: tl.name, username: tl.username, leads: s.leads, arrive: s.arrive, orders: s.orders, revenue: s.revenue, monthLeads: s.monthLeads, monthArrive: s.monthArrive, monthOrders: s.monthOrders, monthRevenue: s.monthRevenue, today_record: tdr || null, member_count: mids.length, members: members };
-  });
-  return [200, { group: { id: g.id, name: g.name, supervisor_name: g.supervisor_name }, team_leaders: tls, prices: D.prices }];
-}
-
-function getUserDetail(tk, tid) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  var t = D.users.find(function(x) { return x.id === tid; });
-  if (!t) return [404, { error: "用户不存在" }];
-  var role = u.role;
-  if (role === "supervisor") {
-    if (t.group_id !== u.group_id) return [403, { error: "无权查看" }];
-  } else if (role === "team_leader") {
-    if (tid !== u.id && t.parent_id !== u.id) return [403, { error: "无权查看" }];
-  } else if (role === "team_member") {
-    if (tid !== u.id) return [403, { error: "无权查看" }];
-  } else { return [403, { error: "无权限" }]; }
-
-  var g = D.groups.find(function(x) { return x.id === t.group_id; });
-  var today = ts(), mp = today.slice(0, 7);
-  var allRecords = D.records.filter(function(r) { return r.user_id === tid; }).sort(function(a, b) { return b.date.localeCompare(a.date); });
-  var todayRec = allRecords.find(function(r) { return r.date === today; }) || null;
-  var monthRecords = allRecords.filter(function(r) { return r.date.slice(0, 7) === mp; });
-  var ml = 0, ma = 0, mo = 0, mr = 0;
-  monthRecords.forEach(function(x) { ml += x.leads || 0; ma += x.arrive || 0; mo += x.orders || 0; mr += (x.arrive || 0) * D.prices.arrive + (x.orders || 0) * D.prices.order; });
-  return [200, {
-    user: { id: t.id, name: t.name, username: t.username, role: t.role },
-    group: g ? { id: g.id, name: g.name, supervisor_name: g.supervisor_name } : null,
-    today_record: todayRec, today_date: today,
-    month_stats: { leads: ml, arrive: ma, orders: mo, revenue: mr, days: monthRecords.length },
-    recent_records: allRecords.slice(0, 14), prices: D.prices
-  }];
-}
-
-function getTrends(tk, q) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  var today = ts(), month = q.month || today.slice(0, 7), uf = q.user_id;
-  var role = u.role, ids = [];
-  if (role === "boss") {
-    ids = D.users.filter(function(x) { return x.role === "team_leader" || x.role === "team_member"; }).map(function(x) { return x.id; });
-    if (uf) ids = [uf];
-  } else if (role === "supervisor") {
-    ids = uidg(u.group_id);
-    if (uf) ids = [uf];
-  } else if (role === "team_leader") {
-    ids = uidtl(u.id);
-    if (uf) ids = [uf];
-  } else { ids = [u.id]; }
-
-  var recs = D.records.filter(function(r) { return ids.indexOf(r.user_id) >= 0; });
-
-  function buildMonth(ym) {
-    var parts = ym.split("-").map(Number), dim = new Date(parts[0], parts[1], 0).getDate(), daily = [];
-    for (var d = 1; d <= dim; d++) {
-      var ds = ym + "-" + String(d).padStart(2, "0");
-      var drs = recs.filter(function(r) { return r.date === ds; });
-      var l = 0, a = 0, o = 0, r = 0;
-      drs.forEach(function(x) { l += x.leads || 0; a += x.arrive || 0; o += x.orders || 0; r += (x.arrive || 0) * D.prices.arrive + (x.orders || 0) * D.prices.order; });
-      daily.push({ date: ds, day: d, leads: l, arrive: a, orders: o, revenue: r });
-    }
-    var ac = daily.filter(function(d) { return d.leads || d.arrive || d.orders; });
-    var total = {
-      leads: daily.reduce(function(s, d) { return s + d.leads; }, 0),
-      arrive: daily.reduce(function(s, d) { return s + d.arrive; }, 0),
-      orders: daily.reduce(function(s, d) { return s + d.orders; }, 0),
-      revenue: daily.reduce(function(s, d) { return s + d.revenue; }, 0),
-      days: ac.length
-    };
-    return { daily: daily, total: total };
-  }
-
-  var cur = buildMonth(month);
-  var parts = month.split("-").map(Number);
-  var prevYM = parts[1] === 1 ? (parts[0] - 1) + "-12" : parts[0] + "-" + String(parts[1] - 1).padStart(2, "0");
-  var prev = buildMonth(prevYM);
-
-  function pct(c, p) { if (p === 0) return c > 0 ? 100 : 0; return Math.round(((c - p) / p) * 1000) / 10; }
-  function to(c, p) { var v = pct(c, p); return { pct: v, direction: v >= 0 ? "up" : "down" }; }
-
-  var trends = {
-    leads: to(cur.total.leads, prev.total.leads),
-    arrive: to(cur.total.arrive, prev.total.arrive),
-    orders: to(cur.total.orders, prev.total.orders),
-    revenue: to(cur.total.revenue, prev.total.revenue)
-  };
-  var h = Math.floor(cur.daily.length / 2);
-  var first = cur.daily.slice(0, h), second = cur.daily.slice(h);
-  var withinMonth = {};
-  ["leads", "arrive", "orders", "revenue"].forEach(function(m) {
-    var fh = first.reduce(function(s, d) { return s + d[m]; }, 0);
-    var sh = second.reduce(function(s, d) { return s + d[m]; }, 0);
-    withinMonth[m] = to(sh, fh);
-  });
-  return [200, { month: month, prev_month: prevYM, daily: cur.daily, month_total: cur.total, prev_month_total: prev.total, trends: trends, within_month: withinMonth, prices: D.prices }];
-}
-
-function getYesterdaySummary(tk) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  var y = ys(), db = db2();
-  var au = D.users.filter(function(x) { return x.role === "team_leader" || x.role === "team_member"; }).map(function(x) { return x.id; });
-  var yTotal = sfd(au, y), dbTotal = sfd(au, db);
-
-  function arr(c, p) {
-    var pctVal = p === 0 ? (c > 0 ? 100 : 0) : Math.round(((c - p) / p) * 1000) / 10;
-    return { dir: pctVal > 0 ? "up" : pctVal < 0 ? "down" : "flat", pct: Math.abs(pctVal) };
-  }
-
-  var groups = D.groups.map(function(g) {
-    var ids = uidg(g.id), yStat = sfd(ids, y), dbStat = sfd(ids, db);
-    return {
-      id: g.id, name: g.name, supervisor_name: g.supervisor_name,
-      yesterday: yStat, day_before: dbStat,
-      arrows: {
-        leads: arr(yStat.leads, dbStat.leads),
-        arrive: arr(yStat.arrive, dbStat.arrive),
-        orders: arr(yStat.orders, dbStat.orders),
-        revenue: arr(yStat.revenue, dbStat.revenue)
-      }
-    };
-  });
-  groups.sort(function(a, b) { return b.yesterday.revenue - a.yesterday.revenue; });
-  var tg = null, tl = null;
-  groups.forEach(function(g) {
-    if (g.arrows.revenue.dir === "up") { if (!tg || g.arrows.revenue.pct > tg.arrows.revenue.pct) tg = g; }
-    if (g.arrows.revenue.dir === "down") { if (!tl || g.arrows.revenue.pct > tl.arrows.revenue.pct) tl = g; }
-  });
-  return [200, {
-    yesterday_date: y, day_before_date: db,
-    total: yTotal, total_prev: dbTotal,
-    total_arrows: {
-      leads: arr(yTotal.leads, dbTotal.leads),
-      arrive: arr(yTotal.arrive, dbTotal.arrive),
-      orders: arr(yTotal.orders, dbTotal.orders),
-      revenue: arr(yTotal.revenue, dbTotal.revenue)
-    },
-    groups: groups, top_gainer: tg, top_loser: tl, prices: D.prices
-  }];
-}
-
-function getAccounts(tk) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  if (u.role !== "boss") return [403, { error: "无权限" }];
-  var ro = { supervisor: 0, team_leader: 1, team_member: 2 };
-  var accounts = D.users.filter(function(x) { return x.role !== "boss"; }).map(function(x) {
-    var g = D.groups.find(function(gg) { return gg.id === x.group_id; });
-    var p = x.parent_id ? D.users.find(function(pp) { return pp.id === x.parent_id; }) : null;
-    var rc = D.records.filter(function(r) { return r.user_id === x.id; }).length;
-    return {
-      id: x.id, name: x.name, username: x.username, role: x.role,
-      group_id: x.group_id || "", group_name: g ? g.name : "",
-      parent_id: x.parent_id || "", parent_name: p ? p.name : "",
-      record_count: rc, created_at: x.created_at || ""
-    };
-  }).sort(function(a, b) { return (ro[a.role] || 99) - (ro[b.role] || 99); });
-  return [200, { accounts: accounts, groups: D.groups.map(function(g) { return { id: g.id, name: g.name, supervisor_name: g.supervisor_name }; }) }];
-}
-
-function postAdminTL(tk, body) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  if (u.role !== "boss") return [403, { error: "无权限" }];
-  if (!body.name || !body.username || !body.password || !body.group_id) return [400, { error: "请填写所有字段" }];
-  if (body.password.length < 6) return [400, { error: "密码至少6位" }];
-  if (D.users.find(function(x) { return x.username === body.username; })) return [400, { error: "账号已存在" }];
-  var g = D.groups.find(function(x) { return x.id === body.group_id; });
-  if (!g) return [400, { error: "组不存在" }];
-  var tlId = gid("tl");
-  D.users.push({ id: tlId, username: body.username, password: body.password, role: "team_leader", name: body.name, group_id: body.group_id, parent_id: null, created_at: ts() });
-  sv();
-  return [200, { ok: true, id: tlId }];
-}
-
-function postAdminTM(tk, body) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  if (u.role !== "boss") return [403, { error: "无权限" }];
-  if (!body.name || !body.username || !body.password || !body.parent_id || !body.group_id) return [400, { error: "请填写所有字段" }];
-  if (body.password.length < 6) return [400, { error: "密码至少6位" }];
-  if (D.users.find(function(x) { return x.username === body.username; })) return [400, { error: "账号已存在" }];
-  var tl = D.users.find(function(x) { return x.id === body.parent_id && x.role === "team_leader"; });
-  if (!tl) return [400, { error: "组长不存在" }];
-  var mId = gid("tm");
-  D.users.push({ id: mId, username: body.username, password: body.password, role: "team_member", name: body.name, group_id: body.group_id, parent_id: body.parent_id, created_at: ts() });
-  sv();
-  return [200, { ok: true, id: mId }];
-}
-
-function deleteAccount(tk, id) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  if (u.role !== "boss") return [403, { error: "无权限" }];
-  var t = D.users.find(function(x) { return x.id === id; });
-  if (!t) return [404, { error: "账号不存在" }];
-  if (t.role === "boss") return [403, { error: "不能删除管理员账号" }];
-  if (t.role === "supervisor") {
-    var gu = D.users.filter(function(x) { return x.group_id === t.group_id && x.id !== t.id; });
-    var guids = gu.map(function(x) { return x.id; });
-    D.records = D.records.filter(function(r) { return guids.indexOf(r.user_id) < 0; });
-    D.users = D.users.filter(function(x) { return x.group_id !== t.group_id || x.id === t.id; });
-    D.groups = D.groups.filter(function(g) { return g.id !== t.group_id; });
-  }
-  if (t.role === "team_leader") {
-    var mids = D.users.filter(function(x) { return x.parent_id === t.id; }).map(function(x) { return x.id; });
-    D.records = D.records.filter(function(r) { return mids.indexOf(r.user_id) < 0; });
-    D.users = D.users.filter(function(x) { return x.parent_id !== t.id; });
-  }
-  D.records = D.records.filter(function(r) { return r.user_id !== t.id; });
-  D.users = D.users.filter(function(x) { return x.id !== t.id; });
-  sv();
-  return [200, { ok: true }];
-}
-
-function postResetPwd(tk, id, body) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  if (u.role !== "boss") return [403, { error: "无权限" }];
-  var t = D.users.find(function(x) { return x.id === id; });
-  if (!t) return [404, { error: "账号不存在" }];
-  if (!body.password || body.password.length < 6) return [400, { error: "密码至少6位" }];
-  t.password = body.password;
-  sv();
-  return [200, { ok: true }];
-}
-
-function postRecordAction(tk, id, action, body) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  var rec = D.records.find(function(r) { return r.id === id; });
-  if (!rec) return [404, { error: "记录不存在" }];
-  var tu = D.users.find(function(x) { return x.id === rec.user_id; });
-  if (!tu) return [404, { error: "用户不存在" }];
-  var role = u.role;
-  if (action === "confirm") {
-    if (role === "team_leader") {
-      if (rec.user_id !== u.id && tu.parent_id !== u.id) return [403, { error: "无权操作" }];
-    } else if (role === "supervisor") {
-      if (tu.group_id !== u.group_id) return [403, { error: "无权操作" }];
-    } else { return [403, { error: "无权限" }]; }
-    rec.status = "confirmed"; rec.confirmed_by = u.id; rec.confirmed_at = new Date().toISOString();
-  } else if (action === "approve") {
-    if (role === "supervisor") {
-      if (tu.group_id !== u.group_id) return [403, { error: "无权操作" }];
-    } else if (role !== "boss") return [403, { error: "无权限" }];
-    rec.status = "approved"; rec.approved_by = u.id; rec.approved_at = new Date().toISOString();
-  } else if (action === "reject") {
-    if (role === "supervisor") {
-      if (tu.group_id !== u.group_id) return [403, { error: "无权操作" }];
-    } else if (role !== "boss") return [403, { error: "无权限" }];
-    rec.status = "rejected"; rec.rejected_by = u.id; rec.rejected_at = new Date().toISOString();
-    rec.reject_reason = (body && body.reason) || "";
-  }
-  sv();
-  return [200, { ok: true }];
-}
-
-function getHrStats() { return [200, D.hr_stats || {}]; }
-function putHrStats(tk, body) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  if (u.role !== "boss" && u.role !== "supervisor" && u.role !== "team_leader") return [403, { error: "无权限" }];
-  D.hr_stats = { active_count: Number(body.active_count) || 0, attendance_today: Number(body.attendance_today) || 0, hiring_positions: Number(body.hiring_positions) || 0, monthly_turnover_rate: Number(body.monthly_turnover_rate) || 0, updated_at: new Date().toISOString(), updated_by: u.id };
-  sv();
-  return [200, { ok: true, hr_stats: D.hr_stats }];
-}
-
-function getMobileAssets() { return [200, D.mobile_assets || {}]; }
-function putMobileAssets(tk, body) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  if (u.role !== "boss" && u.role !== "supervisor") return [403, { error: "无权限" }];
-  D.mobile_assets = { total: Number(body.total) || 0, in_use: Number(body.in_use) || 0, idle: Number(body.idle) || 0, accounts_preparing: Number(body.accounts_preparing) || 0, updated_at: new Date().toISOString(), updated_by: u.id };
-  sv();
-  return [200, { ok: true, mobile_assets: D.mobile_assets }];
-}
-
-function getDiseaseStats() { return [200, D.disease_stats || {}]; }
-function putDiseaseStats(tk, body) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  if (u.role !== "boss" && u.role !== "supervisor") return [403, { error: "无权限" }];
-  D.disease_stats = { vitiligo: Number(body.vitiligo) || 0, psoriasis: Number(body.psoriasis) || 0, dermatitis: Number(body.dermatitis) || 0, updated_at: new Date().toISOString(), updated_by: u.id };
-  sv();
-  return [200, { ok: true, disease_stats: D.disease_stats }];
-}
-
-function getTodos() { return [200, D.todos || []]; }
-function postTodo(tk, body) {
-  var u = extractUser(tk);
-  if (!u) return authFail();
-  var todo = { id: gid("todo"), title: body.title || "", desc: body.desc || "", priority: body.priority || "normal", deadline: body.deadline || "", done: false, created_by: u.id, created_at: new Date().toISOString() };
-  D.todos.push(todo);
-  sv();
-  return [200, { ok: true, todo: todo }];
-}
-function putTodo(id, body) {
-  var t = D.todos.find(function(x) { return x.id === id; });
-  if (!t) return [404, { error: "待办不存在" }];
-  if (body.title !== undefined) t.title = body.title;
-  if (body.desc !== undefined) t.desc = body.desc;
-  if (body.priority !== undefined) t.priority = body.priority;
-  if (body.deadline !== undefined) t.deadline = body.deadline;
-  if (body.done !== undefined) t.done = body.done;
-  sv();
-  return [200, { ok: true, todo: t }];
-}
-function deleteTodo(id) { D.todos = D.todos.filter(function(x) { return x.id !== id; }); sv(); return [200, { ok: true }]; }
-
-// ============ Router ============
-function route(method, path, tk, body, q) {
-  var pp = path.split("/");
-  // Exact routes
-  if (path === "/api/login" && method === "POST") return postLogin(body);
-  if (path === "/api/me" && method === "GET") return getMe(tk);
-  if (path === "/api/dashboard" && method === "GET") return getDashboard(tk);
-  if (path === "/api/prices" && method === "GET") return getPrices();
-  if (path === "/api/prices" && method === "PUT") return putPrices(tk, body);
-  if (path === "/api/supervisors" && method === "POST") return postSupervisors(tk, body);
-  if (path === "/api/team-leaders" && method === "POST") return postTeamLeaders(tk, body);
-  if (path === "/api/records" && method === "POST") return postRecords(tk, body);
-  if (path === "/api/records" && method === "GET") return getRecords(tk, q);
-  if (path === "/api/change_pwd" && method === "POST") return postChangePwd(tk, body);
-  if (path === "/api/groups" && method === "GET") return getGroups(tk);
-  if (path === "/api/accounts" && method === "GET") return getAccounts(tk);
-  if (path === "/api/hr-stats" && method === "GET") return getHrStats();
-  if (path === "/api/hr-stats" && method === "PUT") return putHrStats(tk, body);
-  if (path === "/api/mobile-assets" && method === "GET") return getMobileAssets();
-  if (path === "/api/mobile-assets" && method === "PUT") return putMobileAssets(tk, body);
-  if (path === "/api/disease-stats" && method === "GET") return getDiseaseStats();
-  if (path === "/api/disease-stats" && method === "PUT") return putDiseaseStats(tk, body);
-  if (path === "/api/todos" && method === "GET") return getTodos();
-  if (path === "/api/todos" && method === "POST") return postTodo(tk, body);
-  if (path === "/api/todos" && method === "PUT" && pp.length === 4) return putTodo(pp[3], body);
-  if (path === "/api/todos" && method === "DELETE" && pp.length === 4) return deleteTodo(pp[3]);
-  if (path === "/api/yesterday-summary" && method === "GET") return getYesterdaySummary(tk);
-  if (path === "/api/trends" && method === "GET") return getTrends(tk, q);
-  if (path === "/api/admin/team-leaders" && method === "POST") return postAdminTL(tk, body);
-  if (path === "/api/admin/team-members" && method === "POST") return postAdminTM(tk, body);
-
-  // Dynamic routes
-  if (pp[1] === "api") {
-    // DELETE /api/team-leaders/:id
-    if (pp[2] === "team-leaders" && pp.length === 4 && method === "DELETE") return deleteTeamLeader(tk, pp[3]);
-    // POST /api/team-leaders/:id/members
-    if (pp[2] === "team-leaders" && pp.length === 5 && pp[4] === "members" && method === "POST") return postMember(tk, pp[3], body);
-    // DELETE /api/team-members/:id
-    if (pp[2] === "team-members" && pp.length === 4 && method === "DELETE") return deleteMember(tk, pp[3]);
-    // GET /api/groups/:gid/team-leaders
-    if (pp[2] === "groups" && pp.length === 5 && pp[4] === "team-leaders" && method === "GET") return getGroupTLs(tk, pp[3]);
-    // GET /api/users/:id/detail
-    if (pp[2] === "users" && pp.length === 5 && pp[4] === "detail" && method === "GET") return getUserDetail(tk, pp[3]);
-    // DELETE /api/accounts/:id
-    if (pp[2] === "accounts" && pp.length === 4 && method === "DELETE") return deleteAccount(tk, pp[3]);
-    // POST /api/accounts/:id/reset-password
-    if (pp[2] === "accounts" && pp.length === 5 && pp[4] === "reset-password" && method === "POST") return postResetPwd(tk, pp[3], body);
-    // POST /api/records/:id/(confirm|approve|reject)
-    if (pp[2] === "records" && pp.length === 5 && ["confirm", "approve", "reject"].indexOf(pp[4]) >= 0 && method === "POST") return postRecordAction(tk, pp[3], pp[4], body);
-  }
-
-  return [404, { error: "Not found" }];
-}
-
-// ============ Fetch Override ============
-var _origFetch = window.fetch;
-window.fetch = function(url, opts) {
-  var urlStr = (typeof url === "string") ? url : (url.url || url.toString());
-  if (urlStr.indexOf("/api/") >= 0) {
-    var method = (opts && opts.method) || "GET";
-    var tk = "";
-    if (opts && opts.headers) {
-      var ah = opts.headers.Authorization || opts.headers.authorization || "";
-      if (ah.indexOf("Bearer ") === 0) tk = ah.slice(7);
-    }
-    var body = {};
-    try { if (opts && opts.body) body = JSON.parse(opts.body); } catch(e) {}
-    var up = urlStr;
-    var q = {};
-    if (urlStr.indexOf("?") > 0) {
-      var parts = urlStr.split("?");
-      up = parts[0];
-      parts[1].split("&").forEach(function(p) {
-        var kv = p.split("=");
-        if (kv.length === 2) q[kv[0]] = decodeURIComponent(kv[1]);
-      });
-    }
-    var result = route(method, up, tk, body, q);
-    return Promise.resolve(new Response(JSON.stringify(result[1]), {
-      status: result[0],
-      headers: { "Content-Type": "application/json" }
-    }));
-  }
-  return _origFetch.call(window, url, opts);
+return _of.call(window,url,opts);
 };
 })();
 // ============ END LOCAL STORAGE BACKEND ============
+
 
 // ==================== Auth ====================
 const TOKEN_KEY="bs_token";

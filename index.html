@@ -658,9 +658,44 @@ async function openBorunPanel(){
   var h="<div class=\"modal-title\">📡 e.borun.vip 大数据系统</div>";
   h+="<div class=\"bp-row\"><input id=\"bp_user\" placeholder=\"e.borun.vip 账号\" value=\""+(creds&&creds.username?creds.username:"")+"\"><input id=\"bp_pwd\" type=\"password\" placeholder=\"密码\" value=\""+(creds&&creds.password?creds.password:"")+"\"></div>";
   h+="<div class=\"bp-remember\"><input type=\"checkbox\" id=\"bp_rem\""+(creds&&creds.remember?" checked":"")+"><label>记住账号密码</label></div>";
-  h+="<button class=\"bp-btn\" onclick=\"saveBorunAndOpen()\">💾 保存并打开 e.borun.vip</button>";
+  h+="<button class=\"bp-btn\" onclick=\"saveBorunAndOpen()\"><div style="display:flex;gap:10px;margin-bottom:10px"><button class="bp-btn" onclick="saveBorunAndOpen()" style="flex:1">🔗 打开博润</button><button class="bp-btn" id="bp_sync_btn" onclick="syncBorunData()" style="flex:1;background:linear-gradient(135deg,#059669,#10b981)">🔄 同步数据</button></div></button>";
   h+="<div style=\"margin-top:12px;font-size:12px;color:var(--sub);line-height:1.6\">登录博润后复制数据到录入界面。后续版本将支持自动同步。</div>";
   showModal(h);
+}
+
+async function syncBorunData(){
+  var u=document.getElementById('bp_user').value.trim();
+  var p=document.getElementById('bp_pwd').value;
+  var rem=document.getElementById('bp_rem').checked;
+  if(!u||!p){toast('Please fill credentials','err');return;}
+  try{await apiPost('/api/borun-creds',{username:u,password:p,remember:rem});}catch(e){}
+  var syncBtn=document.getElementById('bp_sync_btn');
+  syncBtn.disabled=true;syncBtn.textContent='Syncing...';
+  var proxy='https://corsproxy.io/?';
+  try{
+    var loginUrl=proxy+encodeURIComponent('https://e.borun.vip/api/login');
+    var loginRes=await fetch(loginUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account:u,password:p})});
+    var loginData=await loginRes.json();
+    if(!loginData.success||!loginData.data){throw new Error('Borun login failed');}
+    var borunToken=loginData.data;
+    var today=new Date().toISOString().slice(0,10);
+    var noticeUrl=proxy+encodeURIComponent('https://e.borun.vip/api/BrRecord/notice');
+    var noticeRes=await fetch(noticeUrl,{headers:{'Authorization':'Bearer '+borunToken}});
+    var noticeData=await noticeRes.json();
+    var totalLeads=0,totalArr=0;
+    if(noticeData.success&&noticeData.data){
+      noticeData.data.forEach(function(item){
+        if(item.title&&item.title.indexOf('线索')>=0)totalLeads+=item.count||0;
+        if(item.title&&item.title.indexOf('到诊')>=0)totalArr+=item.count||0;
+      });
+    }
+    await apiPost('/api/records',{user_id:STATE.user.id,date:today,leads:totalLeads,pass_leads:0,eff_leads:0,total_arrive:totalArr,eff_arrive:0,note:'from e.borun.vip'});
+    toast('Sync OK: '+totalLeads+' leads, '+totalArr+' arrive');
+    closeModal();navTo(CURRENT_PAGE);
+  }catch(e){
+    toast('Sync failed: '+(e.message||'check credentials'),'err');
+    syncBtn.disabled=false;syncBtn.textContent='Sync Data';
+  }
 }
 
 async function saveBorunAndOpen(){

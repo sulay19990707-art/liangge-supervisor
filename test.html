@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Login Test</title>
+<style>
+body{font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;background:#0f172a}
+.card{background:#fff;padding:40px;border-radius:16px;text-align:center;width:360px}
+input{width:100%;padding:12px;margin:8px 0;border:1px solid #ddd;border-radius:8px;font-size:16px}
+button{width:100%;padding:14px;background:#0891b2;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;margin-top:8px}
+#msg{margin-top:12px;color:red;font-size:14px}
+</style>
+</head>
+<body>
+<div class="card">
+<h2>Login Test</h2>
+<input id="u" placeholder="Username" value="xuliang">
+<input id="p" type="password" placeholder="Password" value="mima123456">
+<button onclick="doLogin()">Click to Login</button>
+<div id="msg"></div>
+</div>
+
+<script>
+document.getElementById('msg').textContent = 'JS loaded OK';
+console.log('Script executing');
+
+// UTF-8 safe base64
+function ubtoa(s){
+  var b=[],i,c;
+  for(i=0;i<s.length;i++){
+    c=s.charCodeAt(i);
+    if(c<128)b.push(c);
+    else if(c<2048)b.push(192|(c>>6),128|(c&63));
+    else b.push(224|(c>>12),128|((c>>6)&63),128|(c&63));
+  }
+  return btoa(String.fromCharCode.apply(null,b));
+}
+function uatob(s){
+  var bin=atob(s),b=[],i=0,j=0,r='';
+  for(j=0;j<bin.length;j++)b.push(bin.charCodeAt(j));
+  while(i<b.length){
+    var c=b[i];
+    if(c<128){r+=String.fromCharCode(c);i++;}
+    else if(c<224){r+=String.fromCharCode(((c&31)<<6)|(b[i+1]&63));i+=2;}
+    else{r+=String.fromCharCode(((c&15)<<12)|((b[i+1]&63)<<6)|(b[i+2]&63));i+=3;}
+  }
+  return r;
+}
+
+var DB = {users:[
+  {username:'xuliang',password:'mima123456',name:'徐梁',role:'boss'},
+  {username:'sulaiman',password:'123456',name:'苏来曼',role:'supervisor'}
+]};
+
+function sign(u){
+  return ubtoa(JSON.stringify({id:u.username,name:u.name,role:u.role})) + '.sig';
+}
+
+var origFetch = window.fetch;
+window.fetch = function(url, opts){
+  if(typeof url === 'string' && url === '/api/login'){
+    var b = JSON.parse(opts.body || '{}');
+    var u = DB.users.find(function(x){ return x.username === b.username; });
+    if(!u) return Promise.resolve(new Response(JSON.stringify({error:'no user'}),{status:401,headers:{'Content-Type':'application/json'}}));
+    if(u.password !== b.password) return Promise.resolve(new Response(JSON.stringify({error:'wrong pwd'}),{status:401,headers:{'Content-Type':'application/json'}}));
+    return Promise.resolve(new Response(JSON.stringify({token:sign(u),user:{name:u.name,role:u.role}}),{status:200,headers:{'Content-Type':'application/json'}}));
+  }
+  return origFetch.call(window, url, opts);
+};
+
+async function doLogin(){
+  var msg = document.getElementById('msg');
+  msg.textContent = 'Trying...';
+  msg.style.color = 'blue';
+  try{
+    var u = document.getElementById('u').value;
+    var p = document.getElementById('p').value;
+    var r = await fetch('/api/login', {method:'POST',body:JSON.stringify({username:u,password:p}),headers:{'Content-Type':'application/json'}});
+    var j = await r.json();
+    if(j.token){
+      msg.textContent = 'SUCCESS: ' + j.user.name + ' (' + j.user.role + ')';
+      msg.style.color = 'green';
+    } else {
+      msg.textContent = 'FAILED: ' + (j.error || 'unknown');
+      msg.style.color = 'red';
+    }
+  } catch(e) {
+    msg.textContent = 'ERROR: ' + e.message;
+    msg.style.color = 'red';
+  }
+}
+</script>
+</body></html>

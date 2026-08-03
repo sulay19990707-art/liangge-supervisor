@@ -315,8 +315,12 @@ tr:hover td{background:rgba(236,254,255,.3)}
 .l-field input{width:100%;height:50px;padding:0 18px;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);color:#fff;font-size:15px;letter-spacing:.04em;outline:none;transition:.25s}
 .l-field input::placeholder{color:rgba(255,255,255,.32)}
 .l-field input:focus{border-color:rgba(232,112,42,.75);background:rgba(255,255,255,.1);box-shadow:0 0 0 4px rgba(232,112,42,.16)}
-.l-remember{display:flex;align-items:center;gap:8px;margin:2px 0 14px;font-size:13px;color:rgba(255,240,225,.65)}
-.l-remember input{width:15px;height:15px;margin:0;accent-color:#e8702a}
+.l-remember{display:flex;align-items:center;justify-content:space-between;margin:4px 0 16px;padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1)}
+.l-rem-label{font-size:13px;color:rgba(255,240,225,.85);letter-spacing:.05em;cursor:pointer;user-select:none}
+.l-rem-toggle{position:relative;width:40px;height:22px;-webkit-appearance:none;appearance:none;background:rgba(255,255,255,.2);border-radius:99px;cursor:pointer;transition:.25s;outline:none;margin:0;flex-shrink:0}
+.l-rem-toggle:checked{background:linear-gradient(135deg,#f0722e,#e8702a)}
+.l-rem-toggle::before{content://;position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.25s;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.l-rem-toggle:checked::before{left:21px}
 .l-card #loginBtn{width:100%;height:52px;border:none;border-radius:14px;cursor:pointer;background:linear-gradient(135deg,#f0722e,#e8702a);color:#fff;font-size:16px;font-weight:600;letter-spacing:.3em;text-indent:.3em;box-shadow:0 12px 36px rgba(232,112,42,.4),inset 0 1px 0 rgba(255,255,255,.28);transition:.25s}
 .l-card #loginBtn:hover{transform:translateY(-2px);box-shadow:0 16px 46px rgba(232,112,42,.55)}
 .l-card #loginBtn:disabled{opacity:.55;cursor:not-allowed;transform:none}
@@ -364,7 +368,7 @@ tr:hover td{background:rgba(236,254,255,.3)}
     <div class="l-card">
       <div class="l-field"><label>账 号</label><input id="loginUser" type="text" placeholder="请输入账号" autocomplete="username"></div>
       <div class="l-field"><label>密 码</label><input id="loginPwd" type="password" placeholder="请输入密码" autocomplete="current-password" onkeydown="if(event.key==='Enter')tryLogin()"></div>
-      <div class="l-remember"><input type="checkbox" id="loginRemember"><label for="loginRemember">记住账号密码</label></div>
+      <div class="l-remember"><label class="l-rem-label" for="loginRemember">记住账号密码</label><input type="checkbox" id="loginRemember" class="l-rem-toggle"></div>
       <button id="loginBtn" onclick="tryLogin()">登 录</button>
       <div class="l-err" id="loginErr"></div>
     </div>

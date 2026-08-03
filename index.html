@@ -13,6 +13,8 @@
   --red:#dc2626;--red-bg:#fef2f2;
   --yellow:#d97706;--yellow-bg:#fffbeb;
   --purple:#7c3aed;--purple-bg:#f5f3ff;
+  --btn1:#FF3300;--btn2:#EE7926;--btn-glow:rgba(255,80,20,.5);
+  --bar1:#ccf;--bar2:#e7d04c;--bar3:#31fb78;
   --shadow:0 1px 3px rgba(0,0,0,.04),0 4px 20px rgba(0,0,0,.06);
   --shadow-lg:0 4px 6px rgba(0,0,0,.05),0 16px 48px rgba(0,0,0,.1);
   --radius:18px;--radius-sm:12px;
@@ -20,6 +22,58 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
 body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Inter","Helvetica Neue",sans-serif;background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased}
+
+/* ===== 高级渐变条（顶部） ===== */
+.grad-bar{position:fixed;top:0;left:0;right:0;height:3px;z-index:999;
+  background:linear-gradient(90deg,var(--bar1),var(--bar2),var(--bar3));
+  background-size:200% 100%;animation:barFlow 6s linear infinite}
+@keyframes barFlow{0%{background-position:0% 0}100%{background-position:200% 0}}
+
+/* ===== 浮动光晕 ===== */
+.orb{position:fixed;border-radius:50%;filter:blur(80px);opacity:.35;z-index:-1;pointer-events:none}
+.orb-1{width:360px;height:360px;background:rgba(99,102,241,.18);top:8%;left:-80px;animation:orbFloat1 18s ease-in-out infinite}
+.orb-2{width:320px;height:320px;background:rgba(255,51,0,.10);bottom:5%;right:-60px;animation:orbFloat2 22s ease-in-out infinite}
+.orb-3{width:280px;height:280px;background:rgba(49,251,120,.08);top:55%;left:45%;animation:orbFloat1 26s ease-in-out infinite reverse}
+@keyframes orbFloat1{0%,100%{transform:translate(0,0)}50%{transform:translate(50px,30px)}}
+@keyframes orbFloat2{0%,100%{transform:translate(0,0)}50%{transform:translate(-45px,-35px)}}
+
+/* ===== 渐变发光按钮 ===== */
+.btn-glow{position:relative;border:none !important;color:#fff;font-weight:600;cursor:pointer;
+  background:linear-gradient(135deg,var(--btn1),var(--btn2));
+  box-shadow:0 6px 24px var(--btn-glow),inset 0 1px 0 rgba(255,255,255,.25);
+  transition:transform .2s,box-shadow .2s}
+.btn-glow:hover{transform:translateY(-2px);box-shadow:0 12px 36px rgba(255,80,20,.65),inset 0 1px 0 rgba(255,255,255,.3)}
+.btn-glow::after{content:"";position:absolute;inset:-1px;border-radius:inherit;
+  background:linear-gradient(135deg,var(--btn1),var(--btn2));filter:blur(16px);opacity:.4;z-index:-1;transition:opacity .2s}
+.btn-glow:hover::after{opacity:.7}
+
+/* ===== 渐变文字 ===== */
+.grad-text{background:linear-gradient(92deg,var(--bar1),var(--bar2),var(--bar3));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  background-size:200% auto;animation:shimmer 5s linear infinite}
+@keyframes shimmer{0%{background-position:0% center}100%{background-position:200% center}}
+
+/* ===== 页面入场动画 ===== */
+.page-in{animation:pageFadeUp .5s cubic-bezier(.22,.61,.36,1) both}
+@keyframes pageFadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.stagger>*{animation:pageFadeUp .5s cubic-bezier(.22,.61,.36,1) both}
+.stagger>*:nth-child(1){animation-delay:.03s}.stagger>*:nth-child(2){animation-delay:.07s}
+.stagger>*:nth-child(3){animation-delay:.11s}.stagger>*:nth-child(4){animation-delay:.15s}
+.stagger>*:nth-child(5){animation-delay:.19s}.stagger>*:nth-child(6){animation-delay:.23s}
+
+/* ===== 胶囊徽章 ===== */
+.pill-badge{display:inline-flex;align-items:center;gap:7px;padding:6px 16px;border-radius:999px;
+  background:var(--card-glass);border:1px solid var(--line);backdrop-filter:blur(12px);
+  font-size:12.5px;color:var(--sub);box-shadow:var(--shadow)}
+.pill-badge .pulse-dot{width:7px;height:7px;border-radius:50%;background:var(--bar3);box-shadow:0 0 8px var(--bar3);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ===== 叠加头像 ===== */
+.avatar-stack{display:flex}
+.avatar-stack .av-mini{width:32px;height:32px;border-radius:50%;margin-left:-10px;border:2px solid #fff;
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#fff;
+  box-shadow:0 2px 6px rgba(0,0,0,.15)}
+.avatar-stack .av-mini:first-child{margin-left:0}
 body::before{content:"";position:fixed;inset:0;z-index:-2;
   background:radial-gradient(900px 600px at 10% 5%,rgba(8,145,178,.08),transparent 55%),
   radial-gradient(800px 700px at 85% 15%,rgba(6,182,212,.06),transparent 55%),
@@ -39,14 +93,17 @@ body::after{content:"";position:fixed;inset:0;z-index:-1;background-image:radial
 .login::after{content:"";position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.02) 1px,transparent 1px);background-size:36px 36px}
 .login-card{position:relative;z-index:1;width:420px;max-width:92vw;background:rgba(255,255,255,.92);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);border:1px solid rgba(255,255,255,.3);border-radius:24px;padding:40px 34px 32px;box-shadow:0 32px 80px rgba(0,0,0,.5),0 8px 32px rgba(0,0,0,.3);text-align:center;animation:scaleIn .5s cubic-bezier(.22,.61,.36,1)}
 .login-logo{width:64px;height:64px;margin:0 auto 14px;background:url('logo.png') center/contain no-repeat;display:block;filter:drop-shadow(0 4px 12px rgba(8,145,178,.3))}
-.login-card h1{font-size:22px;font-weight:700;color:var(--ink2);margin-bottom:4px}
+.login-card h1{font-size:22px;font-weight:700;color:var(--ink2);margin-bottom:4px;
+  background:linear-gradient(92deg,#0891b2,#7c3aed,#06b6d4);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  background-size:200% auto;animation:shimmer 5s linear infinite}
 .login-card .sub{color:var(--sub);font-size:13px;margin-bottom:24px}
 .login-card input{width:100%;height:48px;border:1.5px solid var(--line);border-radius:12px;padding:0 16px;font-size:15px;margin-bottom:12px;background:#f8fafc;outline:none;transition:.2s;color:var(--ink)}
 .login-card input:focus{border-color:var(--accent);background:#fff;box-shadow:0 0 0 4px rgba(8,145,178,.1)}
 .login-card .remember-row{display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:13px;color:var(--sub);justify-content:flex-start;padding-left:2px}
 .login-card .remember-row input[type=checkbox]{width:16px;height:16px;margin:0;accent-color:var(--accent)}
-.login-card button{width:100%;height:48px;border:none;border-radius:12px;background:linear-gradient(135deg,#0891b2,#06b6d4);color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:.2s;box-shadow:0 4px 16px rgba(8,145,178,.35)}
-.login-card button:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(8,145,178,.45)}
+.login-card button{width:100%;height:48px;border:none;border-radius:12px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:.2s;
+  background:linear-gradient(135deg,var(--btn1),var(--btn2));box-shadow:0 6px 24px var(--btn-glow),inset 0 1px 0 rgba(255,255,255,.25)}
+.login-card button:hover{transform:translateY(-2px);box-shadow:0 12px 36px rgba(255,80,20,.65),inset 0 1px 0 rgba(255,255,255,.3)}
 .login-card button:disabled{opacity:.5;cursor:not-allowed;transform:none}
 .login-err{color:var(--red);font-size:12.5px;min-height:16px;margin-top:8px}
 
@@ -177,7 +234,7 @@ tr:hover td{background:rgba(236,254,255,.3)}
 .modal-body .btns{display:flex;gap:10px;margin-top:8px}
 .modal-body .btns button{flex:1;height:40px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:.2s}
 .modal-body .btn-cancel{background:#f1f5f9;color:var(--sub)}
-.modal-body .btn-confirm{background:linear-gradient(135deg,#0891b2,#06b6d4);color:#fff;box-shadow:0 2px 12px rgba(8,145,178,.3)}
+.modal-body .btn-confirm{background:linear-gradient(135deg,var(--btn1),var(--btn2));color:#fff;box-shadow:0 4px 16px var(--btn-glow)}
 .modal-body .err{color:var(--red);font-size:12.5px;min-height:16px;margin-top:6px;font-weight:500}
 
 /* Toast */
@@ -230,6 +287,11 @@ tr:hover td{background:rgba(236,254,255,.3)}
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 </head>
 <body>
+
+<div class="grad-bar"></div>
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
 
 <div class="login" id="login">
   <div class="login-card">
@@ -572,7 +634,7 @@ async function renderBossDash(){
     var ar=g.total_arrive>0?Math.round(g.eff_arrive/g.total_arrive*1000)/10:0;
     h+="<div class=\"group-card\" id=\"gc_"+g.id+"\"><div class=\"gc-head\" onclick=\"toggleGroup('"+g.id+"')\"><div class=\"gc-info\"><div class=\"gc-icon\">"+g.name.charAt(0)+"</div><div><div class=\"gc-name\">"+g.name+"</div><div class=\"gc-meta\">"+g.supervisor_name+" · 有效率 "+pctStr(er)+" · 到诊率 "+pctStr(ar)+"</div></div></div><div class=\"gc-stats\"><div class=\"gc-stat\"><div class=\"sv\">"+fmt(g.leads)+"</div><div class=\"sl\">总线索</div></div><div class=\"gc-stat\"><div class=\"sv\">"+fmt(g.eff_leads)+"</div><div class=\"sl\">有效线索</div></div><div class=\"gc-stat\"><div class=\"sv\">"+fmt(g.total_arrive)+"</div><div class=\"sl\">总到诊</div></div><div class=\"gc-stat\"><div class=\"sv\">"+fmt(g.eff_arrive)+"</div><div class=\"sl\">有效到诊</div></div></div><span class=\"gc-arrow\">▼</span></div><div class=\"gc-body\" id=\"gc_body_"+g.id+"\"></div></div>";
   });
-  h+="<button class=\"btn-sm btn-accent\" onclick=\"openTrendModal()\" style=\"margin-top:8px;width:100%;height:44px;font-size:15px\">📈 查看趋势曲线图</button>";
+  h+="<button class=\"btn-sm btn-glow\" onclick=\"openTrendModal()\" style=\"margin-top:8px;width:100%;height:44px;font-size:15px\">📈 查看趋势曲线图</button>";
   document.getElementById("content").innerHTML=h;
 }
 
@@ -604,7 +666,7 @@ async function renderSupDash(){
   h+=kpiCard("有效到诊","🟥","#dc2626",fmt(s.eff_arrive||0),"到诊率 "+pctStr(ar));
   h+="</div>";
   h+="<div class=\"sync-bar\"><div class=\"sync-info\"><div class=\"sync-icon\">📡</div><div class=\"sync-text\"><b>e.borun.vip 大数据同步</b><span>登录博润系统获取数据</span></div></div><button onclick=\"openBorunPanel()\">🔗 登录博润</button></div>";
-  h+="<button class=\"btn-sm btn-accent\" onclick=\"openEntryModal('"+STATE.user.id+"')\" style=\"width:100%;height:44px;font-size:15px;margin-bottom:16px\">📝 录入今日数据</button>";
+  h+="<button class=\"btn-sm btn-glow\" onclick=\"openEntryModal('"+STATE.user.id+"')\" style=\"width:100%;height:44px;font-size:15px;margin-bottom:16px\">📝 录入今日数据</button>";
   // 员工列表
   var members=data.members||[];
   if(members.length>0){
@@ -643,7 +705,7 @@ async function renderMemberDash(){
   h+=kpiCard("有效到诊","🟥","#dc2626",fmt(s.eff_arrive||0),"到诊率 "+pctStr(ar));
   h+="</div>";
   h+="<div class=\"sync-bar\"><div class=\"sync-info\"><div class=\"sync-icon\">📡</div><div class=\"sync-text\"><b>e.borun.vip 大数据同步</b><span>登录博润系统获取数据</span></div></div><button onclick=\"openBorunPanel()\">🔗 登录博润</button></div>";
-  h+="<button class=\"btn-sm btn-accent\" onclick=\"openEntryModal('"+STATE.user.id+"')\" style=\"width:100%;height:44px;font-size:15px;margin-bottom:16px\">📝 录入今日数据</button>";
+  h+="<button class=\"btn-sm btn-glow\" onclick=\"openEntryModal('"+STATE.user.id+"')\" style=\"width:100%;height:44px;font-size:15px;margin-bottom:16px\">📝 录入今日数据</button>";
   h+="<div class=\"section-title\"><h3>📈 本月趋势</h3></div>";
   h+="<div class=\"chart-card\"><div class=\"chart-legend\"><span style=\"color:#0891b2\">● 总线索</span><span style=\"color:#7c3aed\">● 有效线索</span><span style=\"color:#ea580c\">● 总到诊</span><span style=\"color:#dc2626\">● 有效到诊</span></div><div style=\"width:100%;height:280px\"><canvas id=\"supTrendCanvas\" style=\"width:100%;height:100%\"></canvas></div></div>";
   h+="<div class=\"table-card\"><div class=\"tc-head\"><h3>📋 我的记录</h3></div><table><thead><tr><th>日期</th><th>总线索</th><th>有效</th><th>无效</th><th>总到诊</th><th>有效到诊</th><th>有效率</th><th>到诊率</th></tr></thead><tbody>";
@@ -701,7 +763,7 @@ async function renderGroupDash(){
 // ===== IMPORT PAGE =====
 function renderImportPage(){
   var h="<div class=\"page-title\">导入人员表</div><div class=\"page-desc\">管理主管和员工账号</div>";
-  h+="<div style='display:flex;gap:10px;margin-bottom:16px'><button class=\"btn-sm btn-accent\" onclick=\"showAddSupModal()\" style=\"height:40px;font-size:14px\">＋ 添加主管</button><button class=\"btn-sm btn-accent\" onclick=\"showAddMemberModal()\" style=\"height:40px;font-size:14px\">＋ 添加员工</button></div>";
+  h+="<div style='display:flex;gap:10px;margin-bottom:16px'><button class=\"btn-sm btn-glow\" onclick=\"showAddSupModal()\" style=\"height:40px;font-size:14px\">＋ 添加主管</button><button class=\"btn-sm btn-glow\" onclick=\"showAddMemberModal()\" style=\"height:40px;font-size:14px\">＋ 添加员工</button></div>";
   h+="<div class=\"table-card\"><table><thead><tr><th>姓名</th><th>账号</th><th>分组</th><th>员工</th><th>操作</th></tr></thead><tbody id=\"importTableBody\"><tr><td colspan=\"5\" style=\"text-align:center;padding:30px;color:var(--faint)\">加载中…</td></tr></tbody></table></div>";
   document.getElementById("content").innerHTML=h;
   loadAccounts();

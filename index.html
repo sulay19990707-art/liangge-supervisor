@@ -319,7 +319,7 @@ function sign(u){var p=JSON.stringify({id:u.id,role:u.role,name:u.name,group_id:
 function verify(tk){if(!tk)return null;var p=tk.split(".");if(p.length!==2)return null;try{return JSON.parse(uatob(p[0]));}catch(e){return null;}}
 
 function uidg(gid_){var t=D.users.filter(function(u){return(u.role==="supervisor"||u.role==="team_leader"||u.role==="team_member")&&u.group_id===gid_;}).map(function(x){return x.id;});return t;}
-function sf(ids){var t_=ts(),mp=t_.slice(0,7),l=0,pl=0,el=0,ta=0,ea=0,rm=0,pm=0;ids.forEach(function(id){D.records.filter(function(r){return r.user_id===id;}).forEach(function(r){var rev=(r.arrive||0)*D.prices.arrive+(r.orders||0)*D.prices.order;if(r.date===t_){l+=r.leads||0;pl+=r.pass_leads||0;el+=r.eff_leads||0;ta+=r.total_arrive||0;ea+=r.eff_arrive||0;rm+=rev;pm+=rev;}if(r.date.slice(0,7)===mp){pm+=rev;}});});return{leads:l,pass_leads:pl,eff_leads:el,total_arrive:ta,eff_arrive:ea,monthLeads:l,monthArrive:ta,monthRevenue:pm};}
+function sf(ids){var t_=ts(),mp=t_.slice(0,7),l=0,pl=0,el=0,ta=0,ea=0;ids.forEach(function(id){D.records.filter(function(r){return r.user_id===id;}).forEach(function(r){if(r.date===t_){l+=r.leads||0;pl+=r.pass_leads||0;el+=r.eff_leads||0;ta+=r.total_arrive||0;ea+=r.eff_arrive||0;}if(r.date.slice(0,7)===mp){}});});return{leads:l,pass_leads:pl,eff_leads:el,total_arrive:ta,eff_arrive:ea,monthLeads:l,monthArrive:ta,monthRevenue:0};}
 function sfd(ids,ds){var l=0,pl=0,el=0,ta=0,ea=0;ids.forEach(function(id){D.records.filter(function(r){return r.user_id===id&&r.date===ds;}).forEach(function(r){l+=r.leads||0;pl+=r.pass_leads||0;el+=r.eff_leads||0;ta+=r.total_arrive||0;ea+=r.eff_arrive||0;});});return{leads:l,pass_leads:pl,eff_leads:el,total_arrive:ta,eff_arrive:ea};}
 
 // Login
@@ -361,6 +361,11 @@ function getDashboard(tk){
     var myRecs=D.records.filter(function(r){return r.user_id===u.id;}).sort(function(a,b){return b.date.localeCompare(a.date);}).slice(0,30);
     return[200,{role:"supervisor",name:u.name,stats:{leads:s.leads,pass_leads:s.pass_leads,eff_leads:s.eff_leads,total_arrive:s.total_arrive,eff_arrive:s.eff_arrive,invalid:(s.leads-s.eff_leads),eff_rate:rate_eff,arr_rate:rate_arr},records:myRecs,members:members,group:g?{id:g.id,name:g.name}:null}];
   }
+  if(role==="team_member"){
+    var ms=sf([u.id]);
+    var myRecs=D.records.filter(function(r){return r.user_id===u.id;}).sort(function(a,b){return b.date.localeCompare(a.date);}).slice(0,30);
+    return[200,{role:"team_member",name:u.name,stats:{leads:ms.leads,pass_leads:ms.pass_leads,eff_leads:ms.eff_leads,total_arrive:ms.total_arrive,eff_arrive:ms.eff_arrive,invalid:(ms.leads-ms.eff_leads),eff_rate:ms.leads>0?Math.round(ms.eff_leads/ms.leads*1000)/10:0,arr_rate:ms.total_arrive>0?Math.round(ms.eff_arrive/ms.total_arrive*1000)/10:0},records:myRecs}];
+  }
   return[403,{error:"未知角色"}];
 }
 
@@ -375,7 +380,11 @@ function postRecords(tk,b){
   if(!tu)return[403,{error:"目标用户不存在"}];
   var role=u.role;
   if(role==="boss")return[403,{error:"管理员不需要录入数据"}];
-  if(role==="supervisor"&&b.user_id!==u.id)return[403,{error:"只能录入自己的数据"}];
+  if(role==="supervisor"){
+    // 主管可以录自己，也可以代录自己组内的员工
+    if(b.user_id!==u.id&&tu.parent_id!==u.id)return[403,{error:"只能录入自己或自己组员的数据"}];
+  }
+  if(role==="team_member"&&b.user_id!==u.id)return[403,{error:"只能录入自己的数据"}];
   var ix=D.records.findIndex(function(r){return r.user_id===b.user_id&&r.date===b.date;});
   var rec={user_id:b.user_id,date:b.date,leads:Number(b.leads)||0,pass_leads:Number(b.pass_leads)||0,eff_leads:Number(b.eff_leads)||0,total_arrive:Number(b.total_arrive)||0,eff_arrive:Number(b.eff_arrive)||0,note:b.note||"",updated_at:new Date().toISOString()};
   if(ix>=0){for(var k in rec)D.records[ix][k]=rec[k];}else{rec.id=gid("rec");rec.created_at=new Date().toISOString();D.records.push(rec);}
@@ -485,7 +494,7 @@ function fmt(n){return Math.round(n).toLocaleString();}
 function pctStr(n){return (Math.round(n*10)/10)+"%";}
 function todayStr(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
 
-var ROLE_LABELS={boss:"总经理",supervisor:"主管"};
+var ROLE_LABELS={boss:"总经理",supervisor:"主管",team_member:"员工"};
 var STATE={user:null,data:null},CURRENT_PAGE="";
 
 // ===== SIDEBAR =====
@@ -493,8 +502,10 @@ function renderSidebar(){
   var s=document.getElementById("sidebar"),role=STATE.user.role,items=[];
   if(role==="boss"){
     items=[{id:"main_dash",icon:"📊",label:"益彩晶流量号组看板"},{id:"group_dash",icon:"👥",label:"分组看板"},{id:"import_page",icon:"📋",label:"导入人员表"}];
-  }else{
+  }else if(role==="supervisor"){
     items=[{id:"sup_dash",icon:"📊",label:"我的看板"}];
+  }else{
+    items=[{id:"member_dash",icon:"📊",label:"我的看板"}];
   }
   var h="";
   items.forEach(function(it){
@@ -504,7 +515,7 @@ function renderSidebar(){
   s.innerHTML=h;
 }
 
-function navTo(page){CURRENT_PAGE=page;renderSidebar();if(page==="main_dash")renderBossDash();else if(page==="sup_dash")renderSupDash();else if(page==="group_dash")renderGroupDash();else if(page==="import_page")renderImportPage();}
+function navTo(page){CURRENT_PAGE=page;renderSidebar();if(page==="main_dash")renderBossDash();else if(page==="sup_dash")renderSupDash();else if(page==="member_dash")renderMemberDash();else if(page==="group_dash")renderGroupDash();else if(page==="import_page")renderImportPage();}
 
 // ===== LOGIN =====
 async function tryLogin(){
@@ -530,7 +541,7 @@ function showApp(){
   document.getElementById("userRole").textContent=ROLE_LABELS[STATE.user.role]||"";
   document.getElementById("roleTag").textContent=ROLE_LABELS[STATE.user.role]||"";
   document.getElementById("userAv").textContent=STATE.user.name.charAt(0);
-  CURRENT_PAGE=STATE.user.role==="boss"?"main_dash":"sup_dash";
+  CURRENT_PAGE=STATE.user.role==="boss"?"main_dash":(STATE.user.role==="supervisor"?"sup_dash":"member_dash");
   renderSidebar();navTo(CURRENT_PAGE);
 }
 
@@ -600,7 +611,7 @@ async function renderSupDash(){
     h+="<div class=\"section-title\"><h3>👥 组员数据</h3></div>";
     h+="<div class=\"member-grid\">";
     members.forEach(function(m){
-      h+="<div class=\"member-card\"><div class=\"mc-top\"><div><div class=\"mc-name\">"+m.name+"</div><div class=\"mc-sub\">"+m.username+"</div></div></div><div class=\"mc-stats\"><div class=\"mc-stat\"><div class=\"sv\">"+fmt(m.leads)+"</div><div class=\"sl\">总线索</div></div><div class=\"mc-stat\"><div class=\"sv\">"+fmt(m.eff_leads)+"</div><div class=\"sl\">有效</div></div><div class=\"mc-stat\"><div class=\"sv\">"+fmt(m.invalid)+"</div><div class=\"sl\">无效</div></div><div class=\"mc-stat\"><div class=\"sv\">"+fmt(m.eff_arrive)+"</div><div class=\"sl\">到诊</div></div></div><div class=\"sc-rates\"><span class=\"sc-rate tag-green\">有效率 "+pctStr(m.eff_rate)+"</span><span class=\"sc-rate tag-accent\">到诊率 "+pctStr(m.arr_rate)+"</span></div></div>";
+      h+="<div class=\"member-card\"><div class=\"mc-top\"><div><div class=\"mc-name\">"+m.name+"</div><div class=\"mc-sub\">"+m.username+"</div></div></div><div class=\"mc-stats\"><div class=\"mc-stat\"><div class=\"sv\">"+fmt(m.leads)+"</div><div class=\"sl\">总线索</div></div><div class=\"mc-stat\"><div class=\"sv\">"+fmt(m.eff_leads)+"</div><div class=\"sl\">有效</div></div><div class=\"mc-stat\"><div class=\"sv\">"+fmt(m.invalid)+"</div><div class=\"sl\">无效</div></div><div class=\"mc-stat\"><div class=\"sv\">"+fmt(m.eff_arrive)+"</div><div class=\"sl\">到诊</div></div></div><div class=\"sc-rates\"><span class=\"sc-rate tag-green\">有效率 "+pctStr(m.eff_rate)+"</span><span class=\"sc-rate tag-accent\">到诊率 "+pctStr(m.arr_rate)+"</span></div><button class=\"mc-enter\" onclick=\"openEntryModal('"+m.id+"')\" style=\"width:100%;margin-top:10px\">📝 代录 "+m.name+" 数据</button></div>";
     });
     h+="</div>";
   }
@@ -615,6 +626,32 @@ async function renderSupDash(){
   h+="</tbody></table></div>";
   document.getElementById("content").innerHTML=h;
   // 画趋势图
+  drawSupTrend();
+}
+
+async function renderMemberDash(){
+  var data=await apiGet("/api/dashboard");STATE.data=data;
+  var s=data.stats||{},name=data.name||STATE.user.name;
+  var er=s.leads>0?Math.round(s.eff_leads/s.leads*1000)/10:0;
+  var ar=s.total_arrive>0?Math.round(s.eff_arrive/s.total_arrive*1000)/10:0;
+  var h="<div class=\"page-title\">"+name+" · 我的数据</div><div class=\"page-desc\">"+todayStr()+"</div>";
+  h+="<div class=\"kpi-row\">";
+  h+=kpiCard("总线索","🟦","#0891b2",fmt(s.leads||0),"");
+  h+=kpiCard("有效线索","🟪","#7c3aed",fmt(s.eff_leads||0),"有效率 "+pctStr(er));
+  h+=kpiCard("无效数","⬜","#94a3b8",fmt(s.invalid||0),"");
+  h+=kpiCard("总到诊","🟧","#ea580c",fmt(s.total_arrive||0),"");
+  h+=kpiCard("有效到诊","🟥","#dc2626",fmt(s.eff_arrive||0),"到诊率 "+pctStr(ar));
+  h+="</div>";
+  h+="<div class=\"sync-bar\"><div class=\"sync-info\"><div class=\"sync-icon\">📡</div><div class=\"sync-text\"><b>e.borun.vip 大数据同步</b><span>登录博润系统获取数据</span></div></div><button onclick=\"openBorunPanel()\">🔗 登录博润</button></div>";
+  h+="<button class=\"btn-sm btn-accent\" onclick=\"openEntryModal('"+STATE.user.id+"')\" style=\"width:100%;height:44px;font-size:15px;margin-bottom:16px\">📝 录入今日数据</button>";
+  h+="<div class=\"section-title\"><h3>📈 本月趋势</h3></div>";
+  h+="<div class=\"chart-card\"><div class=\"chart-legend\"><span style=\"color:#0891b2\">● 总线索</span><span style=\"color:#7c3aed\">● 有效线索</span><span style=\"color:#ea580c\">● 总到诊</span><span style=\"color:#dc2626\">● 有效到诊</span></div><div style=\"width:100%;height:280px\"><canvas id=\"supTrendCanvas\" style=\"width:100%;height:100%\"></canvas></div></div>";
+  h+="<div class=\"table-card\"><div class=\"tc-head\"><h3>📋 我的记录</h3></div><table><thead><tr><th>日期</th><th>总线索</th><th>有效</th><th>无效</th><th>总到诊</th><th>有效到诊</th><th>有效率</th><th>到诊率</th></tr></thead><tbody>";
+  (data.records||[]).slice(0,14).forEach(function(r){
+    h+="<tr><td>"+r.date+"</td><td>"+fmt(r.leads||0)+"</td><td>"+fmt(r.eff_leads||0)+"</td><td>"+fmt((r.leads||0)-(r.eff_leads||0))+"</td><td>"+fmt(r.total_arrive||0)+"</td><td>"+fmt(r.eff_arrive||0)+"</td><td>"+pctStr(r.leads>0?r.eff_leads/r.leads*100:0)+"</td><td>"+pctStr(r.total_arrive>0?r.eff_arrive/r.total_arrive*100:0)+"</td></tr>";
+  });
+  h+="</tbody></table></div>";
+  document.getElementById("content").innerHTML=h;
   drawSupTrend();
 }
 
@@ -689,7 +726,7 @@ async function loadAccounts(){
 }
 
 function showAddMemberModal(){
-  showModal("<div class=\"modal-title\">添加员工</div><div class=\"field\"><label>所属主管</label><select id=\"am_sup\"></select></div><div class=\"field\"><label>员工姓名</label><input id=\"am_name\" placeholder=\"如：小李\"></div><div class=\"field\"><label>账号（拼音）</label><input id=\"am_user\" placeholder=\"如：xiaoli\"></div><div class=\"field\"><label>密码</label><input id=\"am_pwd\" type=\"password\" value=\"123456\"></div><div class=\"btns\"><button class=\"btn-cancel\" onclick=\"closeModal()\">取消</button><button class=\"btn-confirm\" onclick=\"addMember()\">确认添加</button></div><div class=\"err\" id=\"am_err\"></div>");
+  showModal("<div class=\"modal-title\">添加员工</div><div class=\"field\"><label>所属主管</label><select id=\"am_sup\"></select></div><div class=\"field\"><label>员工姓名</label><input id=\"am_name\" placeholder=\"如：小李\"></div><div class=\"field\"><label>账号（拼音）</label><input id=\"am_user\" placeholder=\"如：xiaoli\"></div><div class=\"field\"><label>密码</label><input id=\"am_pwd\" type=\"password\" placeholder=\"默认 123456\"></div><div class=\"btns\"><button class=\"btn-cancel\" onclick=\"closeModal()\">取消</button><button class=\"btn-confirm\" onclick=\"addMember()\">确认添加</button></div><div class=\"err\" id=\"am_err\"></div>");
   loadSupOptions();
 }
 
@@ -708,7 +745,7 @@ async function addMember(){
   var sup=document.getElementById("am_sup").value;
   var n=document.getElementById("am_name").value.trim();
   var u=document.getElementById("am_user").value.trim();
-  var p=document.getElementById("am_pwd").value;
+  var p=document.getElementById("am_pwd").value||"123456";
   var err=document.getElementById("am_err");
   if(!sup||!n||!u||!p){err.textContent="请填写所有字段";return;}
   try{await apiPost("/api/members",{supervisor_id:sup,name:n,username:u,password:p});toast("添加成功");closeModal();loadAccounts();}catch(e){err.textContent=e.message;}
@@ -720,13 +757,13 @@ async function deleteMember(id){
 }
 
 function showAddSupModal(){
-  showModal("<div class=\"modal-title\">添加主管</div><div class=\"field\"><label>姓名</label><input id=\"as_name\" placeholder=\"如：苏来曼\"></div><div class=\"field\"><label>账号（拼音）</label><input id=\"as_user\" placeholder=\"如：sulaiman\"></div><div class=\"field\"><label>密码</label><input id=\"as_pwd\" type=\"password\" value=\"123456\"></div><div class=\"field\"><label>分组名</label><input id=\"as_group\" placeholder=\"如：苏来曼组\"></div><div class=\"btns\"><button class=\"btn-cancel\" onclick=\"closeModal()\">取消</button><button class=\"btn-confirm\" onclick=\"addSupervisor()\">确认添加</button></div><div class=\"err\" id=\"as_err\"></div>");
+  showModal("<div class=\"modal-title\">添加主管</div><div class=\"field\"><label>姓名</label><input id=\"as_name\" placeholder=\"如：苏来曼\"></div><div class=\"field\"><label>账号（拼音）</label><input id=\"as_user\" placeholder=\"如：sulaiman\"></div><div class=\"field\"><label>密码</label><input id=\"as_pwd\" type=\"password\" placeholder=\"默认 123456\"></div><div class=\"field\"><label>分组名</label><input id=\"as_group\" placeholder=\"如：苏来曼组\"></div><div class=\"btns\"><button class=\"btn-cancel\" onclick=\"closeModal()\">取消</button><button class=\"btn-confirm\" onclick=\"addSupervisor()\">确认添加</button></div><div class=\"err\" id=\"as_err\"></div>");
 }
 
 async function addSupervisor(){
   var n=document.getElementById("as_name").value.trim();
   var u=document.getElementById("as_user").value.trim();
-  var p=document.getElementById("as_pwd").value;
+  var p=document.getElementById("as_pwd").value||"123456";
   var g=document.getElementById("as_group").value.trim();
   var err=document.getElementById("as_err");
   if(!n||!u||!p||!g){err.textContent="请填写所有字段";return;}

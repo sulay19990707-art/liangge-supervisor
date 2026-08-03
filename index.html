@@ -655,7 +655,7 @@ async function saveEntry(userId){
 }
 
 // ===== BORUN PANEL =====
-var BORUN={token:null,orgs:[],data:null};
+var BORUN={token:null,orgs:[],data:null,timeStart:'',timeEnd:''};
 async function openBorunPanel(){
   var creds=null;
   try{creds=await apiGet("/api/borun-creds");}catch(e){}
@@ -676,46 +676,101 @@ async function borunLogin(){
   try{await apiPost('/api/borun-creds',{username:u,password:p,remember:rem});}catch(e){}
   out.textContent='正在登录博润...';
   try{
-    // 直接调博润 API（CORS 已验证放行）
     var loginRes=await fetch('https://e.borun.vip/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account:u,password:p})});
     var loginData=await loginRes.json();
     if(!loginData.success||!loginData.data){throw new Error('博润登录失败: '+(loginData.message||''));}
     BORUN.token=loginData.data;
     out.innerHTML='✅ 博润登录成功！正在获取数据...';
-    // 获取组织
     var orgsRes=await fetch('https://e.borun.vip/api/BrReport/getMediaOrgs',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+BORUN.token},body:'{}'});
     var orgsData=await orgsRes.json();
     BORUN.orgs=orgsData.data||[];
-    // 获取今日数据
-    var today=new Date();
-    var ts=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
-    var monthStart=ts.slice(0,8)+'01';
-    var monthEnd=ts.slice(0,8)+String(new Date(today.getFullYear(),today.getMonth()+1,0).getDate()).padStart(2,'0');
-    var dashRes=await fetch('https://e.borun.vip/api/BrReport/dashboardNewMediaAnalysis',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+BORUN.token},body:JSON.stringify({timeStart:ts,timeEnd:ts})});
-    var dashData=await dashRes.json();
-    BORUN.data=dashData.data||null;
-    renderBorunResult(out);
+    // 默认加载今日
+    var t=new Date();
+    BORUN.timeStart=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
+    BORUN.timeEnd=BORUN.timeStart;
+    await borunLoadData(out);
   }catch(e){
     out.textContent='❌ '+(e.message||'登录失败');
     out.style.color='var(--red)';
   }
 }
 
+async function borunLoadData(out){
+  if(!BORUN.token){toast('请先登录博润','err');return;}
+  if(!out)out=document.getElementById('bp_result');
+  out.innerHTML='正在加载 '+BORUN.timeStart+' ~ '+BORUN.timeEnd+' 数据...';
+  try{
+    var dashRes=await fetch('https://e.borun.vip/api/BrReport/dashboardNewMediaAnalysis',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+BORUN.token},body:JSON.stringify({timeStart:BORUN.timeStart,timeEnd:BORUN.timeEnd})});
+    var dashData=await dashRes.json();
+    BORUN.data=dashData.data||null;
+    renderBorunResult(out);
+  }catch(e){
+    out.textContent='❌ 获取数据失败: '+(e.message||'');
+    out.style.color='var(--red)';
+  }
+}
+
+function borunSetRange(kind){
+  var t=new Date(),y=t.getFullYear(),m=t.getMonth(),d=t.getDate();
+  function pad(n){return String(n).padStart(2,'0');}
+  function iso(yy,mm,dd){return yy+'-'+pad(mm+1)+'-'+pad(dd);}
+  if(kind==='today'){BORUN.timeStart=iso(y,m,d);BORUN.timeEnd=iso(y,m,d);}
+  else if(kind==='week'){
+    var dow=(t.getDay()+6)%7; // 周一起始
+    var ms=new Date(y,m,d-dow),me=new Date(y,m,d-dow+6);
+    BORUN.timeStart=iso(ms.getFullYear(),ms.getMonth(),ms.getDate());
+    BORUN.timeEnd=iso(me.getFullYear(),me.getMonth(),me.getDate());
+  }
+  else if(kind==='month'){BORUN.timeStart=iso(y,m,1);BORUN.timeEnd=iso(y,m,new Date(y,m+1,0).getDate());}
+  else if(kind==='year'){BORUN.timeStart=y+'-01-01';BORUN.timeEnd=y+'-12-31';}
+  // 高亮当前按钮
+  var btns=document.querySelectorAll('.bp-time-btn');
+  btns.forEach(function(b){b.style.background='';b.style.color='';});
+  if(kind!=='custom'){
+    btns.forEach(function(b){if(b.getAttribute('data-kind')===kind){b.style.background='#0891b2';b.style.color='#fff';}});
+  }
+  borunLoadData(document.getElementById('bp_result'));
+}
+
+function borunSetCustom(){
+  var s=document.getElementById('bp_cs').value;
+  var e=document.getElementById('bp_ce').value;
+  if(!s||!e){toast('请选择起止日期','err');return;}
+  if(s>e){toast('开始日期不能晚于结束日期','err');return;}
+  BORUN.timeStart=s;BORUN.timeEnd=e;
+  var btns=document.querySelectorAll('.bp-time-btn');
+  btns.forEach(function(b){b.style.background='';b.style.color='';});
+  borunLoadData(document.getElementById('bp_result'));
+}
+
 function renderBorunResult(out){
   if(!BORUN.data)return;
   var orgData=BORUN.data.orgData||[];
-  // 精确获取益彩晶 11 个子号 id（从组织树取 10161 的直接子级）
   var ycjChildIds=[];
   BORUN.orgs.forEach(function(o){
     if(o.id==='10161'&&o.children){
       o.children.forEach(function(c){ycjChildIds.push(c.id);});
     }
   });
-  var h='<div style="margin-top:10px;font-weight:700;color:var(--ink2)">📊 今日数据（博润实时）</div>';
+  // 时间维度按钮
+  var h='<div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap">';
+  h+='<button class="bp-time-btn bp-btn" data-kind="today" onclick="borunSetRange(\'today\')" style="flex:1;min-width:60px;background:#0891b2;color:#fff">今日</button>';
+  h+='<button class="bp-time-btn bp-btn" data-kind="week" onclick="borunSetRange(\'week\')" style="flex:1;min-width:60px">本周</button>';
+  h+='<button class="bp-time-btn bp-btn" data-kind="month" onclick="borunSetRange(\'month\')" style="flex:1;min-width:60px">本月</button>';
+  h+='<button class="bp-time-btn bp-btn" data-kind="year" onclick="borunSetRange(\'year\')" style="flex:1;min-width:60px">本年</button>';
+  h+='</div>';
+  // 自定义日期
+  h+='<div style="display:flex;gap:6px;margin-top:8px;align-items:center">';
+  h+='<input type="date" id="bp_cs" value="'+BORUN.timeStart+'" style="flex:1;height:36px;border:1.5px solid var(--line);border-radius:8px;padding:0 8px;font-size:12px">';
+  h+='<span style="color:var(--faint)">~</span>';
+  h+='<input type="date" id="bp_ce" value="'+BORUN.timeEnd+'" style="flex:1;height:36px;border:1.5px solid var(--line);border-radius:8px;padding:0 8px;font-size:12px">';
+  h+='<button class="bp-btn" onclick="borunSetCustom()" style="flex:0 0 auto;padding:0 14px;font-size:12px">查询</button>';
+  h+='</div>';
+  // 数据表格
+  h+='<div style="margin-top:10px;font-weight:700;color:var(--ink2)">📊 '+BORUN.timeStart+' ~ '+BORUN.timeEnd+' 数据（博润实时）</div>';
   h+='<table style="width:100%;font-size:12px;margin-top:8px;border-collapse:collapse">';
   h+='<tr style="background:var(--bg2)"><th style="padding:6px">分组</th><th>录入</th><th>预约</th><th>已到</th><th>未到</th><th>就诊</th><th>流失</th></tr>';
   var total={count:0,orderCount:0,orderArriveCount:0,orderNoArriveCount:0,successCount:0,failureCount:0};
-  // 益彩晶父公司 + 11 个子号（按组织树顺序）
   orgData.forEach(function(o){
     if(o.id==='10161'||ycjChildIds.indexOf(o.id)>=0){
       var isParent=(o.id==='10161');
@@ -725,7 +780,7 @@ function renderBorunResult(out){
   });
   h+='</table>';
   h+='<div style="margin-top:12px;display:flex;gap:10px">';
-  h+='<button class="bp-btn" onclick="borunFillToday()" style="flex:1">📥 填入今日数据</button>';
+  h+='<button class="bp-btn" onclick="borunFillToday()" style="flex:1">📥 填入数据</button>';
   h+='<button class="bp-btn" onclick="window.open(\'https://e.borun.vip\',\'_blank\')" style="flex:1;background:linear-gradient(135deg,#059669,#10b981)">🔗 打开博润</button>';
   h+='</div>';
   out.innerHTML=h;
@@ -734,19 +789,18 @@ function renderBorunResult(out){
 
 async function borunFillToday(){
   if(!BORUN.data){toast('请先登录博润','err');return;}
-  var today=new Date().toISOString().slice(0,10);
   var t=BORUN.total||{count:0,orderCount:0,orderArriveCount:0,successCount:0};
-  // 映射到系统指标：录入=总线索 预约=通过线索 已到=有效线索 就诊=有效到诊
-  var d={user_id:STATE.user.id,date:today,
+  var date=BORUN.timeEnd||new Date().toISOString().slice(0,10);
+  var d={user_id:STATE.user.id,date:date,
     leads:t.count||0,
     pass_leads:t.orderCount||0,
     eff_leads:t.orderArriveCount||0,
     total_arrive:(t.orderArriveCount||0)+(t.orderNoArriveCount||0),
     eff_arrive:t.successCount||0,
-    note:'博润自动同步'};
+    note:'博润同步 '+BORUN.timeStart+'~'+BORUN.timeEnd};
   try{
     await apiPost('/api/records',d);
-    toast('✅ 已填入今日数据');
+    toast('✅ 已填入 '+date+' 数据');
     closeModal();
     navTo(CURRENT_PAGE);
   }catch(e){toast(e.message,'err');}

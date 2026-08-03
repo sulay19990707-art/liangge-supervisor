@@ -417,7 +417,8 @@ function route(method,path,tk,body,q){
 var _of=window.fetch;
 window.fetch=function(url,opts){
   var us=(typeof url==="string")?url:(url.url||url.toString());
-  if(us.indexOf("/api/")>=0){
+  // 只拦截本地相对路径 /api/ 开头的请求；博润的完整 URL（https://...）直接放行
+  if(us.indexOf("/api/")===0){
     var m=(opts&&opts.method)||"GET",tk="";
     if(opts&&opts.headers){var ah=opts.headers.Authorization||opts.headers.authorization||"";if(ah.indexOf("Bearer ")===0)tk=ah.slice(7);}
     var body={};try{if(opts&&opts.body)body=JSON.parse(opts.body);}catch(e){}
@@ -654,58 +655,101 @@ async function saveEntry(userId){
 }
 
 // ===== BORUN PANEL =====
+var BORUN={token:null,orgs:[],data:null};
 async function openBorunPanel(){
   var creds=null;
   try{creds=await apiGet("/api/borun-creds");}catch(e){}
   var h="<div class=\"modal-title\">📡 e.borun.vip 大数据系统</div>";
-  h+="<div class=\"bp-row\"><input id=\"bp_user\" placeholder=\"e.borun.vip 账号\" value=\""+(creds&&creds.username?creds.username:"")+"\"><input id=\"bp_pwd\" type=\"password\" placeholder=\"密码\" value=\""+(creds&&creds.password?creds.password:"")+"\"></div>";
+  h+="<div class=\"bp-row\"><input id=\"bp_user\" placeholder=\"博润账号\" value=\""+(creds&&creds.username?creds.username:"")+"\"><input id=\"bp_pwd\" type=\"password\" placeholder=\"密码\" value=\""+(creds&&creds.password?creds.password:"")+"\"></div>";
   h+="<div class=\"bp-remember\"><input type=\"checkbox\" id=\"bp_rem\""+(creds&&creds.remember?" checked":"")+"><label>记住账号密码</label></div>";
-  h+="<button class=\"bp-btn\" onclick=\"saveBorunAndOpen()\"><div style='display:flex;gap:10px;margin-bottom:10px'><button class=\"bp-btn\" onclick=\"saveBorunAndOpen()\" style='flex:1'>🔗 打开博润</button><button class=\"bp-btn\" id=\"bp_sync_btn\" onclick=\"syncBorunData()\" style='flex:1;background:linear-gradient(135deg,#059669,#10b981)'>🔄 同步数据</button></div></button>";
-  h+="<div style=\"margin-top:12px;font-size:12px;color:var(--sub);line-height:1.6\">登录博润后复制数据到录入界面。后续版本将支持自动同步。</div>";
+  h+="<div style='display:flex;gap:10px;margin-bottom:10px'><button class=\"bp-btn\" onclick=\"borunLogin()\">🔐 登录博润</button></div>";
+  h+="<div id=\"bp_result\" style=\"font-size:13px;color:var(--sub);min-height:60px\"></div>";
   showModal(h);
 }
 
-async function syncBorunData(){
+async function borunLogin(){
   var u=document.getElementById('bp_user').value.trim();
   var p=document.getElementById('bp_pwd').value;
   var rem=document.getElementById('bp_rem').checked;
-  if(!u||!p){toast('Please fill credentials','err');return;}
+  var out=document.getElementById('bp_result');
+  if(!u||!p){out.textContent='请填写账号密码';out.style.color='var(--red)';return;}
   try{await apiPost('/api/borun-creds',{username:u,password:p,remember:rem});}catch(e){}
-  var syncBtn=document.getElementById('bp_sync_btn');
-  syncBtn.disabled=true;syncBtn.textContent='Syncing...';
-  var proxy='https://corsproxy.io/?';
+  out.textContent='正在登录博润...';
   try{
-    var loginUrl=proxy+encodeURIComponent('https://e.borun.vip/api/login');
-    var loginRes=await fetch(loginUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account:u,password:p})});
+    // 直接调博润 API（CORS 已验证放行）
+    var loginRes=await fetch('https://e.borun.vip/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account:u,password:p})});
     var loginData=await loginRes.json();
-    if(!loginData.success||!loginData.data){throw new Error('Borun login failed');}
-    var borunToken=loginData.data;
-    var today=new Date().toISOString().slice(0,10);
-    var noticeUrl=proxy+encodeURIComponent('https://e.borun.vip/api/BrRecord/notice');
-    var noticeRes=await fetch(noticeUrl,{headers:{'Authorization':'Bearer '+borunToken}});
-    var noticeData=await noticeRes.json();
-    var totalLeads=0,totalArr=0;
-    if(noticeData.success&&noticeData.data){
-      noticeData.data.forEach(function(item){
-        if(item.title&&item.title.indexOf('线索')>=0)totalLeads+=item.count||0;
-        if(item.title&&item.title.indexOf('到诊')>=0)totalArr+=item.count||0;
-      });
-    }
-    await apiPost('/api/records',{user_id:STATE.user.id,date:today,leads:totalLeads,pass_leads:0,eff_leads:0,total_arrive:totalArr,eff_arrive:0,note:'from e.borun.vip'});
-    toast('Sync OK: '+totalLeads+' leads, '+totalArr+' arrive');
-    closeModal();navTo(CURRENT_PAGE);
+    if(!loginData.success||!loginData.data){throw new Error('博润登录失败: '+(loginData.message||''));}
+    BORUN.token=loginData.data;
+    out.innerHTML='✅ 博润登录成功！正在获取数据...';
+    // 获取组织
+    var orgsRes=await fetch('https://e.borun.vip/api/BrReport/getMediaOrgs',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+BORUN.token},body:'{}'});
+    var orgsData=await orgsRes.json();
+    BORUN.orgs=orgsData.data||[];
+    // 获取今日数据
+    var today=new Date();
+    var ts=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+    var monthStart=ts.slice(0,8)+'01';
+    var monthEnd=ts.slice(0,8)+String(new Date(today.getFullYear(),today.getMonth()+1,0).getDate()).padStart(2,'0');
+    var dashRes=await fetch('https://e.borun.vip/api/BrReport/dashboardNewMediaAnalysis',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+BORUN.token},body:JSON.stringify({timeStart:ts,timeEnd:ts})});
+    var dashData=await dashRes.json();
+    BORUN.data=dashData.data||null;
+    renderBorunResult(out);
   }catch(e){
-    toast('Sync failed: '+(e.message||'check credentials'),'err');
-    syncBtn.disabled=false;syncBtn.textContent='Sync Data';
+    out.textContent='❌ '+(e.message||'登录失败');
+    out.style.color='var(--red)';
   }
 }
 
-async function saveBorunAndOpen(){
-  var u=document.getElementById("bp_user").value.trim();
-  var p=document.getElementById("bp_pwd").value;
-  var rem=document.getElementById("bp_rem").checked;
-  if(!u||!p){toast("请填写账号密码","err");return;}
-  try{await apiPost("/api/borun-creds",{username:u,password:p,remember:rem});toast("已保存，正在打开...");closeModal();window.open("https://e.borun.vip","_blank");}catch(e){toast(e.message,"err");}
+function renderBorunResult(out){
+  if(!BORUN.data)return;
+  var orgData=BORUN.data.orgData||[];
+  // 精确获取益彩晶 11 个子号 id（从组织树取 10161 的直接子级）
+  var ycjChildIds=[];
+  BORUN.orgs.forEach(function(o){
+    if(o.id==='10161'&&o.children){
+      o.children.forEach(function(c){ycjChildIds.push(c.id);});
+    }
+  });
+  var h='<div style="margin-top:10px;font-weight:700;color:var(--ink2)">📊 今日数据（博润实时）</div>';
+  h+='<table style="width:100%;font-size:12px;margin-top:8px;border-collapse:collapse">';
+  h+='<tr style="background:var(--bg2)"><th style="padding:6px">分组</th><th>录入</th><th>预约</th><th>已到</th><th>未到</th><th>就诊</th><th>流失</th></tr>';
+  var total={count:0,orderCount:0,orderArriveCount:0,orderNoArriveCount:0,successCount:0,failureCount:0};
+  // 益彩晶父公司 + 11 个子号（按组织树顺序）
+  orgData.forEach(function(o){
+    if(o.id==='10161'||ycjChildIds.indexOf(o.id)>=0){
+      var isParent=(o.id==='10161');
+      h+='<tr'+(isParent?' style="font-weight:700;background:var(--accent-bg)"':'')+'><td>'+(isParent?'益彩晶流量号公司(汇总)':o.name)+'</td><td>'+o.count+'</td><td>'+o.orderCount+'</td><td>'+o.orderArriveCount+'</td><td>'+o.orderNoArriveCount+'</td><td>'+o.successCount+'</td><td>'+o.failureCount+'</td></tr>';
+      total.count+=o.count;total.orderCount+=o.orderCount;total.orderArriveCount+=o.orderArriveCount;total.orderNoArriveCount+=o.orderNoArriveCount;total.successCount+=o.successCount;total.failureCount+=o.failureCount;
+    }
+  });
+  h+='</table>';
+  h+='<div style="margin-top:12px;display:flex;gap:10px">';
+  h+='<button class="bp-btn" onclick="borunFillToday()" style="flex:1">📥 填入今日数据</button>';
+  h+='<button class="bp-btn" onclick="window.open(\'https://e.borun.vip\',\'_blank\')" style="flex:1;background:linear-gradient(135deg,#059669,#10b981)">🔗 打开博润</button>';
+  h+='</div>';
+  out.innerHTML=h;
+  BORUN.total=total;
+}
+
+async function borunFillToday(){
+  if(!BORUN.data){toast('请先登录博润','err');return;}
+  var today=new Date().toISOString().slice(0,10);
+  var t=BORUN.total||{count:0,orderCount:0,orderArriveCount:0,successCount:0};
+  // 映射到系统指标：录入=总线索 预约=通过线索 已到=有效线索 就诊=有效到诊
+  var d={user_id:STATE.user.id,date:today,
+    leads:t.count||0,
+    pass_leads:t.orderCount||0,
+    eff_leads:t.orderArriveCount||0,
+    total_arrive:(t.orderArriveCount||0)+(t.orderNoArriveCount||0),
+    eff_arrive:t.successCount||0,
+    note:'博润自动同步'};
+  try{
+    await apiPost('/api/records',d);
+    toast('✅ 已填入今日数据');
+    closeModal();
+    navTo(CURRENT_PAGE);
+  }catch(e){toast(e.message,'err');}
 }
 
 // ===== TREND CHART =====

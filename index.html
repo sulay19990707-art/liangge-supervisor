@@ -456,7 +456,7 @@ function fmt(n){return Math.round(n).toLocaleString();}
 function pctStr(n){return (Math.round(n*10)/10)+"%";}
 function todayStr(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
 
-var ROLE_LABELS={boss:"管理员",supervisor:"主管"};
+var ROLE_LABELS={boss:"总经理",supervisor:"主管"};
 var STATE={user:null,data:null},CURRENT_PAGE="";
 
 // ===== SIDEBAR =====
@@ -465,7 +465,7 @@ function renderSidebar(){
   if(role==="boss"){
     items=[{id:"main_dash",icon:"📊",label:"益彩晶流量号组看板"},{id:"group_dash",icon:"👥",label:"分组看板"},{id:"import_page",icon:"📋",label:"导入人员表"}];
   }else{
-    items=[{id:"sup_dash",icon:"📊",label:"分组看板"},{id:"import_page",icon:"📋",label:"导入人员表"}];
+    items=[{id:"sup_dash",icon:"📊",label:"我的看板"}];
   }
   var h="";
   items.forEach(function(it){

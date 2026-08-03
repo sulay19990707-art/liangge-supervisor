@@ -353,8 +353,13 @@ function getDashboard(tk){
     var rate_eff=s.leads>0?Math.round(s.eff_leads/s.leads*1000)/10:0;
     var rate_arr=s.total_arrive>0?Math.round(s.eff_arrive/s.total_arrive*1000)/10:0;
     var g=D.groups.find(function(x){return x.id===gid_;});
+    // 组员列表（员工）：挂在主管名下的 team_member
+    var members=D.users.filter(function(x){return x.role==="team_member"&&x.parent_id===u.id;}).map(function(m){
+      var ms=sf([m.id]);
+      return{id:m.id,name:m.name,username:m.username,leads:ms.leads,pass_leads:ms.pass_leads,eff_leads:ms.eff_leads,total_arrive:ms.total_arrive,eff_arrive:ms.eff_arrive,invalid:(ms.leads-ms.eff_leads),eff_rate:ms.leads>0?Math.round(ms.eff_leads/ms.leads*1000)/10:0,arr_rate:ms.total_arrive>0?Math.round(ms.eff_arrive/ms.total_arrive*1000)/10:0};
+    });
     var myRecs=D.records.filter(function(r){return r.user_id===u.id;}).sort(function(a,b){return b.date.localeCompare(a.date);}).slice(0,30);
-    return[200,{role:"supervisor",name:u.name,stats:{leads:s.leads,pass_leads:s.pass_leads,eff_leads:s.eff_leads,total_arrive:s.total_arrive,eff_arrive:s.eff_arrive,eff_rate:rate_eff,arr_rate:rate_arr},records:myRecs,group:g?{id:g.id,name:g.name}:null}];
+    return[200,{role:"supervisor",name:u.name,stats:{leads:s.leads,pass_leads:s.pass_leads,eff_leads:s.eff_leads,total_arrive:s.total_arrive,eff_arrive:s.eff_arrive,invalid:(s.leads-s.eff_leads),eff_rate:rate_eff,arr_rate:rate_arr},records:myRecs,members:members,group:g?{id:g.id,name:g.name}:null}];
   }
   return[403,{error:"未知角色"}];
 }
@@ -395,7 +400,29 @@ function getRecords(tk,q){var u=verify(tk);if(!u)return[401,{error:"未登录"}]
 
 function postChangePwd(tk,b){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(!b.oldPwd||!b.newPwd)return[400,{error:"请填写旧密码和新密码"}];if(b.newPwd.length<6)return[400,{error:"新密码至少6位"}];var r=D.users.find(function(x){return x.id===u.id;});if(!r)return[401,{error:"用户不存在"}];if(r.password!==b.oldPwd)return[401,{error:"旧密码错误"}];r.password=b.newPwd;sv();return[200,{ok:true}];}
 
-function getAccounts(tk){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(u.role!=="boss")return[403,{error:"无权限"}];var acs=D.users.filter(function(x){return x.role==="supervisor";}).map(function(x){var g=D.groups.find(function(gg){return gg.id===x.group_id;});return{id:x.id,name:x.name,username:x.username,group_name:g?g.name:"",record_count:D.records.filter(function(r){return r.user_id===x.id;}).length};});return[200,{accounts:acs,groups:D.groups.map(function(g){return{id:g.id,name:g.name,supervisor_name:g.supervisor_name};})}];}
+function getAccounts(tk){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(u.role!=="boss")return[403,{error:"无权限"}];var acs=D.users.filter(function(x){return x.role==="supervisor";}).map(function(x){var g=D.groups.find(function(gg){return gg.id===x.group_id;});var mems=D.users.filter(function(m){return m.role==="team_member"&&m.parent_id===x.id;});return{id:x.id,name:x.name,username:x.username,group_name:g?g.name:"",member_count:mems.length,record_count:D.records.filter(function(r){return r.user_id===x.id;}).length,members:mems.map(function(m){return{id:m.id,name:m.name,username:m.username};})};});return[200,{accounts:acs,groups:D.groups.map(function(g){return{id:g.id,name:g.name,supervisor_name:g.supervisor_name};})}];}
+
+function postMember(tk,b){
+  var u=verify(tk);if(!u)return[401,{error:"未登录"}];
+  if(u.role!=="boss")return[403,{error:"无权限"}];
+  if(!b.supervisor_id||!b.name||!b.username||!b.password)return[400,{error:"请填写所有字段"}];
+  var sup=D.users.find(function(x){return x.id===b.supervisor_id&&x.role==="supervisor";});
+  if(!sup)return[400,{error:"主管不存在"}];
+  if(D.users.find(function(x){return x.username===b.username;}))return[400,{error:"账号已存在"}];
+  var mid=gid("tm");
+  D.users.push({id:mid,username:b.username,password:b.password,role:"team_member",name:b.name,group_id:sup.group_id,parent_id:sup.id,created_at:ts()});
+  sv();return[200,{ok:true,id:mid}];
+}
+
+function delMember(tk,id){
+  var u=verify(tk);if(!u)return[401,{error:"未登录"}];
+  if(u.role!=="boss")return[403,{error:"无权限"}];
+  var m=D.users.find(function(x){return x.id===id&&x.role==="team_member";});
+  if(!m)return[404,{error:"员工不存在"}];
+  D.users=D.users.filter(function(x){return x.id!==id;});
+  D.records=D.records.filter(function(r){return r.user_id!==id;});
+  sv();return[200,{ok:true}];
+}
 
 function route(method,path,tk,body,q){
   var pp=path.split("/");
@@ -403,6 +430,7 @@ function route(method,path,tk,body,q){
   if(path==="/api/me"&&method==="GET")return getMe(tk);
   if(path==="/api/dashboard"&&method==="GET")return getDashboard(tk);
   if(path==="/api/supervisors"&&method==="POST")return postSupervisors(tk,body);
+  if(path==="/api/members"&&method==="POST")return postMember(tk,body);
   if(path==="/api/records"&&method==="POST")return postRecords(tk,body);
   if(path==="/api/records"&&method==="GET")return getRecords(tk,q);
   if(path==="/api/change_pwd"&&method==="POST")return postChangePwd(tk,body);
@@ -411,6 +439,7 @@ function route(method,path,tk,body,q){
   if(path==="/api/borun-creds"&&method==="GET")return getBorunCreds(tk);
   if(path==="/api/borun-creds"&&method==="POST")return saveBorunCreds(tk,body);
   if(pp[1]==="api"&&pp[2]==="supervisors"&&pp.length===4&&method==="DELETE")return delSupervisor(tk,pp[3]);
+  if(pp[1]==="api"&&pp[2]==="members"&&pp.length===4&&method==="DELETE")return delMember(tk,pp[3]);
   return[404,{error:"Not found"}];
 }
 
@@ -558,19 +587,64 @@ async function renderSupDash(){
   var h="<div class=\"page-title\">"+name+" · 数据看板</div><div class=\"page-desc\">"+todayStr()+"</div>";
   h+="<div class=\"kpi-row\">";
   h+=kpiCard("总线索","🟦","#0891b2",fmt(s.leads||0),"");
-  h+=kpiCard("总通过线索","🟩","#059669",fmt(s.pass_leads||0),"");
   h+=kpiCard("有效线索","🟪","#7c3aed",fmt(s.eff_leads||0),"有效率 "+pctStr(er));
+  h+=kpiCard("无效数","⬜","#94a3b8",fmt(s.invalid||0),"");
   h+=kpiCard("总到诊","🟧","#ea580c",fmt(s.total_arrive||0),"");
   h+=kpiCard("有效到诊","🟥","#dc2626",fmt(s.eff_arrive||0),"到诊率 "+pctStr(ar));
   h+="</div>";
   h+="<div class=\"sync-bar\"><div class=\"sync-info\"><div class=\"sync-icon\">📡</div><div class=\"sync-text\"><b>e.borun.vip 大数据同步</b><span>登录博润系统获取数据</span></div></div><button onclick=\"openBorunPanel()\">🔗 登录博润</button></div>";
   h+="<button class=\"btn-sm btn-accent\" onclick=\"openEntryModal('"+STATE.user.id+"')\" style=\"width:100%;height:44px;font-size:15px;margin-bottom:16px\">📝 录入今日数据</button>";
-  h+="<div class=\"table-card\"><div class=\"tc-head\"><h3>📋 近期记录</h3><button class=\"btn-sm btn-accent\" onclick=\"openTrendModal()\">📈 趋势</button></div><table><thead><tr><th>日期</th><th>总线索</th><th>通过</th><th>有效</th><th>总到诊</th><th>有效到诊</th><th>有效率</th><th>到诊率</th></tr></thead><tbody>";
+  // 员工列表
+  var members=data.members||[];
+  if(members.length>0){
+    h+="<div class=\"section-title\"><h3>👥 组员数据</h3></div>";
+    h+="<div class=\"member-grid\">";
+    members.forEach(function(m){
+      h+="<div class=\"member-card\"><div class=\"mc-top\"><div><div class=\"mc-name\">"+m.name+"</div><div class=\"mc-sub\">"+m.username+"</div></div></div><div class=\"mc-stats\"><div class=\"mc-stat\"><div class=\"sv\">"+fmt(m.leads)+"</div><div class=\"sl\">总线索</div></div><div class=\"mc-stat\"><div class=\"sv\">"+fmt(m.eff_leads)+"</div><div class=\"sl\">有效</div></div><div class=\"mc-stat\"><div class=\"sv\">"+fmt(m.invalid)+"</div><div class=\"sl\">无效</div></div><div class=\"mc-stat\"><div class=\"sv\">"+fmt(m.eff_arrive)+"</div><div class=\"sl\">到诊</div></div></div><div class=\"sc-rates\"><span class=\"sc-rate tag-green\">有效率 "+pctStr(m.eff_rate)+"</span><span class=\"sc-rate tag-accent\">到诊率 "+pctStr(m.arr_rate)+"</span></div></div>";
+    });
+    h+="</div>";
+  }
+  // 趋势图直接显示
+  h+="<div class=\"section-title\"><h3>📈 本月趋势</h3></div>";
+  h+="<div class=\"chart-card\"><div class=\"chart-legend\"><span style=\"color:#0891b2\">● 总线索</span><span style=\"color:#7c3aed\">● 有效线索</span><span style=\"color:#ea580c\">● 总到诊</span><span style=\"color:#dc2626\">● 有效到诊</span></div><div style=\"width:100%;height:280px\"><canvas id=\"supTrendCanvas\" style=\"width:100%;height:100%\"></canvas></div></div>";
+  // 近期记录
+  h+="<div class=\"table-card\"><div class=\"tc-head\"><h3>📋 近期记录</h3><button class=\"btn-sm btn-accent\" onclick=\"openTrendModal()\">📈 详细趋势</button></div><table><thead><tr><th>日期</th><th>总线索</th><th>有效</th><th>无效</th><th>总到诊</th><th>有效到诊</th><th>有效率</th><th>到诊率</th></tr></thead><tbody>";
   (data.records||[]).slice(0,14).forEach(function(r){
-    h+="<tr><td>"+r.date+"</td><td>"+fmt(r.leads||0)+"</td><td>"+fmt(r.pass_leads||0)+"</td><td>"+fmt(r.eff_leads||0)+"</td><td>"+fmt(r.total_arrive||0)+"</td><td>"+fmt(r.eff_arrive||0)+"</td><td>"+pctStr(r.leads>0?r.eff_leads/r.leads*100:0)+"</td><td>"+pctStr(r.total_arrive>0?r.eff_arrive/r.total_arrive*100:0)+"</td></tr>";
+    h+="<tr><td>"+r.date+"</td><td>"+fmt(r.leads||0)+"</td><td>"+fmt(r.eff_leads||0)+"</td><td>"+fmt((r.leads||0)-(r.eff_leads||0))+"</td><td>"+fmt(r.total_arrive||0)+"</td><td>"+fmt(r.eff_arrive||0)+"</td><td>"+pctStr(r.leads>0?r.eff_leads/r.leads*100:0)+"</td><td>"+pctStr(r.total_arrive>0?r.eff_arrive/r.total_arrive*100:0)+"</td></tr>";
   });
   h+="</tbody></table></div>";
   document.getElementById("content").innerHTML=h;
+  // 画趋势图
+  drawSupTrend();
+}
+
+async function drawSupTrend(){
+  var canvas=document.getElementById("supTrendCanvas");
+  if(!canvas)return;
+  var today=new Date();var month=today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0");
+  var data=await apiGet("/api/trends?month="+month);
+  var daily=data.daily||[];
+  var ctx=canvas.getContext("2d");
+  var W=canvas.parentElement.clientWidth||700;var H=280;
+  canvas.width=W;canvas.height=H;
+  ctx.clearRect(0,0,W,H);
+  if(daily.length===0){ctx.fillStyle="#94a3b8";ctx.font="14px sans-serif";ctx.textAlign="center";ctx.fillText("暂无数据",W/2,H/2);return;}
+  var metrics=["leads","eff_leads","total_arrive","eff_arrive"];
+  var colors={"leads":"#0891b2","eff_leads":"#7c3aed","total_arrive":"#ea580c","eff_arrive":"#dc2626"};
+  var labels={"leads":"总线索","eff_leads":"有效线索","total_arrive":"总到诊","eff_arrive":"有效到诊"};
+  var maxVal=0;daily.forEach(function(d){metrics.forEach(function(m){maxVal=Math.max(maxVal,d[m]||0);});});
+  maxVal=Math.ceil(maxVal*1.2/10)*10||10;
+  var pL=50,pR=15,pT=20,pB=35,cW=W-pL-pR,cH=H-pT-pB;
+  ctx.strokeStyle="#e2e8f0";ctx.lineWidth=1;ctx.font="11px sans-serif";ctx.fillStyle="#94a3b8";ctx.textAlign="right";
+  for(var i=0;i<=5;i++){var y=pT+(cH/5)*i,val=Math.round(maxVal*(5-i)/5);ctx.beginPath();ctx.moveTo(pL,y);ctx.lineTo(W-pR,y);ctx.stroke();ctx.fillText(val,pL-8,y+4);}
+  ctx.textAlign="center";
+  var step=Math.max(1,Math.floor(daily.length/8));
+  daily.forEach(function(d,i){if(i%step===0||i===daily.length-1){ctx.fillText(d.day,pL+(cW/(daily.length-1||1))*i,H-pB+16);}});
+  metrics.forEach(function(m){
+    ctx.strokeStyle=colors[m];ctx.lineWidth=2.5;ctx.beginPath();
+    daily.forEach(function(d,i){var x=pL+(cW/(daily.length-1||1))*i,y=pT+cH-(d[m]||0)/maxVal*cH;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);});
+    ctx.stroke();
+  });
 }
 
 // ===== GROUP DASH =====
@@ -589,9 +663,9 @@ async function renderGroupDash(){
 
 // ===== IMPORT PAGE =====
 function renderImportPage(){
-  var h="<div class=\"page-title\">导入人员表</div><div class=\"page-desc\">管理主管账号</div>";
-  h+="<button class=\"btn-sm btn-accent\" onclick=\"showAddSupModal()\" style=\"height:40px;font-size:14px;margin-bottom:16px\">＋ 添加主管</button>";
-  h+="<div class=\"table-card\"><table><thead><tr><th>姓名</th><th>账号</th><th>分组</th><th>操作</th></tr></thead><tbody id=\"importTableBody\"><tr><td colspan=\"4\" style=\"text-align:center;padding:30px;color:var(--faint)\">加载中…</td></tr></tbody></table></div>";
+  var h="<div class=\"page-title\">导入人员表</div><div class=\"page-desc\">管理主管和员工账号</div>";
+  h+="<div style='display:flex;gap:10px;margin-bottom:16px'><button class=\"btn-sm btn-accent\" onclick=\"showAddSupModal()\" style=\"height:40px;font-size:14px\">＋ 添加主管</button><button class=\"btn-sm btn-accent\" onclick=\"showAddMemberModal()\" style=\"height:40px;font-size:14px\">＋ 添加员工</button></div>";
+  h+="<div class=\"table-card\"><table><thead><tr><th>姓名</th><th>账号</th><th>分组</th><th>员工</th><th>操作</th></tr></thead><tbody id=\"importTableBody\"><tr><td colspan=\"5\" style=\"text-align:center;padding:30px;color:var(--faint)\">加载中…</td></tr></tbody></table></div>";
   document.getElementById("content").innerHTML=h;
   loadAccounts();
 }
@@ -600,10 +674,49 @@ async function loadAccounts(){
   var data=await apiGet("/api/accounts");
   var h="";
   (data.accounts||[]).forEach(function(a){
-    h+="<tr><td><b>"+a.name+"</b></td><td>"+a.username+"</td><td>"+a.group_name+"</td><td><button class=\"btn-sm btn-danger\" onclick=\"deleteSupervisor('"+a.id+"')\">删除</button></td></tr>";
+    h+="<tr><td><b>"+a.name+"</b></td><td>"+a.username+"</td><td>"+a.group_name+"</td><td>";
+    if(a.members&&a.members.length>0){
+      a.members.forEach(function(m){
+        h+=m.name+" <button class=\"btn-sm\" style=\"height:22px;padding:0 6px;font-size:11px;color:var(--red)\" onclick=\"deleteMember('"+m.id+"')\">✕</button> ";
+      });
+    }else{
+      h+="<span style='color:var(--faint)'>无</span>";
+    }
+    h+="</td><td><button class=\"btn-sm btn-danger\" onclick=\"deleteSupervisor('"+a.id+"')\">删除</button></td></tr>";
   });
-  if(!h)h="<tr><td colspan=\"4\" style=\"text-align:center;padding:30px;color:var(--faint)\">暂无主管</td></tr>";
+  if(!h)h="<tr><td colspan=\"5\" style=\"text-align:center;padding:30px;color:var(--faint)\">暂无主管</td></tr>";
   document.getElementById("importTableBody").innerHTML=h;
+}
+
+function showAddMemberModal(){
+  showModal("<div class=\"modal-title\">添加员工</div><div class=\"field\"><label>所属主管</label><select id=\"am_sup\"></select></div><div class=\"field\"><label>员工姓名</label><input id=\"am_name\" placeholder=\"如：小李\"></div><div class=\"field\"><label>账号（拼音）</label><input id=\"am_user\" placeholder=\"如：xiaoli\"></div><div class=\"field\"><label>密码</label><input id=\"am_pwd\" type=\"password\" value=\"123456\"></div><div class=\"btns\"><button class=\"btn-cancel\" onclick=\"closeModal()\">取消</button><button class=\"btn-confirm\" onclick=\"addMember()\">确认添加</button></div><div class=\"err\" id=\"am_err\"></div>");
+  loadSupOptions();
+}
+
+async function loadSupOptions(){
+  var data=await apiGet("/api/accounts");
+  var sel=document.getElementById("am_sup");
+  if(!sel)return;
+  var h="";
+  (data.accounts||[]).forEach(function(a){
+    h+="<option value=\""+a.id+"\">"+a.name+"（"+a.group_name+"）</option>";
+  });
+  sel.innerHTML=h;
+}
+
+async function addMember(){
+  var sup=document.getElementById("am_sup").value;
+  var n=document.getElementById("am_name").value.trim();
+  var u=document.getElementById("am_user").value.trim();
+  var p=document.getElementById("am_pwd").value;
+  var err=document.getElementById("am_err");
+  if(!sup||!n||!u||!p){err.textContent="请填写所有字段";return;}
+  try{await apiPost("/api/members",{supervisor_id:sup,name:n,username:u,password:p});toast("添加成功");closeModal();loadAccounts();}catch(e){err.textContent=e.message;}
+}
+
+async function deleteMember(id){
+  if(!confirm("确定删除此员工？其数据将一并删除。"))return;
+  try{await apiDel("/api/members/"+id);toast("已删除");loadAccounts();}catch(e){toast(e.message,"err");}
 }
 
 function showAddSupModal(){

@@ -350,6 +350,7 @@ function uatob(s){var bin=atob(s),b=[],i=0,j=0,r="";for(j=0;j<bin.length;j++)b.p
 function initDB(){
   return {
     users:[
+      {id:"admin",username:"admin",password:"admin123",role:"admin",name:"管理员",group_id:null,parent_id:null},
       {id:"boss",username:"xuliang",password:"mima123456",role:"boss",name:"徐梁",group_id:null,parent_id:null},
       {id:"sup_sulaiman",username:"sulaiman",password:"123456",role:"supervisor",name:"苏来曼",group_id:"g_sulaiman",parent_id:null},
       {id:"sup_zhangwenyuan",username:"zhangwenyuan",password:"123456",role:"supervisor",name:"张文远",group_id:"g_zhangwenyuan",parent_id:null},
@@ -402,13 +403,28 @@ function getDashboard(tk){
   var u=verify(tk);if(!u)return[401,{error:"未登录"}];
   var role=u.role,t_=ts();
   if(role==="boss"){
-    var groups=D.groups.map(function(g){
-      var ids=uidg(g.id),s=sf(ids);
-      var rate_eff=s.leads>0?Math.round(s.eff_leads/s.leads*1000)/10:0;
-      var rate_arr=s.total_arrive>0?Math.round(s.eff_arrive/s.total_arrive*1000)/10:0;
-      return{id:g.id,name:g.name,supervisor_name:g.supervisor_name,leads:s.leads,pass_leads:s.pass_leads,eff_leads:s.eff_leads,total_arrive:s.total_arrive,eff_arrive:s.eff_arrive,eff_rate:rate_eff,arr_rate:rate_arr};
+    // 主管树：每个主管含员工数据
+    var sups=D.users.filter(function(x){return x.role==="supervisor";}).map(function(sup){
+      var g=D.groups.find(function(gg){return gg.id===sup.group_id;});
+      var s=sf([sup.id]);
+      var members=D.users.filter(function(m){return m.role==="team_member"&&m.parent_id===sup.id;}).map(function(m){
+        var ms=sf([m.id]);
+        return{id:m.id,name:m.name,username:m.username,leads:ms.leads,eff_leads:ms.eff_leads,invalid:(ms.leads-ms.eff_leads),total_arrive:ms.total_arrive,eff_arrive:ms.eff_arrive,eff_rate:ms.leads>0?Math.round(ms.eff_leads/ms.leads*1000)/10:0,arr_rate:ms.total_arrive>0?Math.round(ms.eff_arrive/ms.total_arrive*1000)/10:0};
+      });
+      var er=s.leads>0?Math.round(s.eff_leads/s.leads*1000)/10:0;
+      var ar=s.total_arrive>0?Math.round(s.eff_arrive/s.total_arrive*1000)/10:0;
+      return{id:sup.id,name:sup.name,username:sup.username,group_id:sup.group_id,group_name:g?g.name:"",leads:s.leads,pass_leads:s.pass_leads,eff_leads:s.eff_leads,total_arrive:s.total_arrive,eff_arrive:s.eff_arrive,invalid:(s.leads-s.eff_leads),eff_rate:er,arr_rate:ar,members:members};
     });
-    return[200,{role:"boss",groups:groups}];
+    // 全部数据（主管+员工）
+    var allIds=D.users.filter(function(x){return x.role==="supervisor"||x.role==="team_member";}).map(function(x){return x.id;});
+    var allS=sf(allIds);
+    var today=new Date(),pad=function(n){return String(n).padStart(2,"0");};
+    var tStr=today.getFullYear()+"-"+pad(today.getMonth()+1)+"-"+pad(today.getDate());
+    var monthStart=tStr.slice(0,8)+"01";
+    var monthEnd=tStr.slice(0,8)+pad(new Date(today.getFullYear(),today.getMonth()+1,0).getDate());
+    var yearStart=today.getFullYear()+"-01-01";
+    var yearEnd=today.getFullYear()+"-12-31";
+    return[200,{role:"boss",sups:sups,total:{leads:allS.leads,eff_leads:allS.eff_leads,invalid:(allS.leads-allS.eff_leads),total_arrive:allS.total_arrive,eff_arrive:allS.eff_arrive,eff_rate:allS.leads>0?Math.round(allS.eff_leads/allS.leads*1000)/10:0,arr_rate:allS.total_arrive>0?Math.round(allS.eff_arrive/allS.total_arrive*1000)/10:0},date:{today:tStr,monthStart:monthStart,monthEnd:monthEnd,yearStart:yearStart,yearEnd:yearEnd}}];
   }
   if(role==="supervisor"){
     var gid_=u.group_id,ids=uidg(gid_),s=sf(ids);
@@ -431,7 +447,29 @@ function getDashboard(tk){
   return[403,{error:"未知角色"}];
 }
 
-function postSupervisors(tk,b){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(u.role!=="boss")return[403,{error:"无权限"}];if(!b.name||!b.groupName||!b.username||!b.password)return[400,{error:"请填写所有字段"}];if(D.users.find(function(x){return x.username===b.username;}))return[400,{error:"账号已存在"}];var gid_=gid("g"),sid=gid("sup");D.groups.push({id:gid_,name:b.groupName,supervisor_id:sid,supervisor_name:b.name,created_at:ts()});D.users.push({id:sid,username:b.username,password:b.password,role:"supervisor",name:b.name,group_id:gid_,parent_id:null});sv();return[200,{ok:true,group_id:gid_,supervisor_id:sid}];}
+
+function postBoss(tk,b){
+  var u=verify(tk);if(!u)return[401,{error:"未登录"}];
+  if(u.role!=="admin")return[403,{error:"无权限"}];
+  if(!b.name||!b.username||!b.password)return[400,{error:"请填写所有字段"}];
+  if(b.password.length<6)return[400,{error:"密码至少6位"}];
+  if(D.users.find(function(x){return x.username===b.username;}))return[400,{error:"账号已存在"}];
+  var bid=gid("boss");
+  D.users.push({id:bid,username:b.username,password:b.password,role:"boss",name:b.name,group_id:null,parent_id:null,created_at:ts()});
+  sv();return[200,{ok:true,id:bid}];
+}
+
+function postSupervisors(tk,b){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(u.role!=="boss"&&u.role!=="admin")return[403,{error:"无权限"}];if(!b.name||!b.groupName||!b.username||!b.password)return[400,{error:"请填写所有字段"}];if(D.users.find(function(x){return x.username===b.username;}))return[400,{error:"账号已存在"}];var gid_=gid("g"),sid=gid("sup");D.groups.push({id:gid_,name:b.groupName,supervisor_id:sid,supervisor_name:b.name,created_at:ts()});D.users.push({id:sid,username:b.username,password:b.password,role:"supervisor",name:b.name,group_id:gid_,parent_id:null});sv();return[200,{ok:true,group_id:gid_,supervisor_id:sid}];}
+
+
+function delBoss(tk,id){
+  var u=verify(tk);if(!u)return[401,{error:"未登录"}];
+  if(u.role!=="admin")return[403,{error:"无权限"}];
+  var t=D.users.find(function(x){return x.id===id&&x.role==="boss";});
+  if(!t)return[404,{error:"总经理不存在"}];
+  D.users=D.users.filter(function(x){return x.id!==t.id;});
+  sv();return[200,{ok:true}];
+}
 
 function delSupervisor(tk,id){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(u.role!=="boss")return[403,{error:"无权限"}];var t=D.users.find(function(x){return x.id===id&&x.role==="supervisor";});if(!t)return[404,{error:"主管不存在"}];D.records=D.records.filter(function(r){return r.user_id!==t.id;});D.users=D.users.filter(function(x){return x.id!==t.id;});D.groups=D.groups.filter(function(g){return g.id!==t.group_id;});sv();return[200,{ok:true}];}
 
@@ -461,21 +499,54 @@ function getBorunCreds(tk){var u=verify(tk);if(!u)return[401,{error:"未登录"}
 function getTrends(tk,q){
   var u=verify(tk);if(!u)return[401,{error:"未登录"}];
   var t_=ts(),mo=q.month||t_.slice(0,7),role=u.role,ids=[];
-  if(role==="boss"){ids=D.users.filter(function(x){return x.role==="supervisor";}).map(function(x){return x.id;});}else{ids=[u.id];}
+  if(role==="boss"){ids=D.users.filter(function(x){return x.role==="supervisor"||x.role==="team_member";}).map(function(x){return x.id;});}else{ids=[u.id];}
   var recs=D.records.filter(function(r){return ids.indexOf(r.user_id)>=0;});
   function bmd(ym){var p_=ym.split("-").map(Number),dim=new Date(p_[0],p_[1],0).getDate(),dy=[];for(var d=1;d<=dim;d++){var ds=ym+"-"+String(d).padStart(2,"0"),drs=recs.filter(function(r){return r.date===ds;}),l=0,pl=0,el=0,ta=0,ea=0;drs.forEach(function(r){l+=r.leads||0;pl+=r.pass_leads||0;el+=r.eff_leads||0;ta+=r.total_arrive||0;ea+=r.eff_arrive||0;});dy.push({date:ds,day:d,leads:l,pass_leads:pl,eff_leads:el,total_arrive:ta,eff_arrive:ea});}return{daily:dy,total:{leads:dy.reduce(function(s,d){return s+d.leads;},0),pass_leads:dy.reduce(function(s,d){return s+d.pass_leads;},0),eff_leads:dy.reduce(function(s,d){return s+d.eff_leads;},0),total_arrive:dy.reduce(function(s,d){return s+d.total_arrive;},0),eff_arrive:dy.reduce(function(s,d){return s+d.eff_arrive;},0)}};}
-  var cur=bmd(mo);return[200,{month:mo,daily:cur.daily}];
+  var cur=bmd(mo);
+  if(q.mode==="year"){
+    var ys=q.year||new Date().getFullYear();
+    var months=[];
+    for(var mi=1;mi<=12;mi++){
+      var ym=ys+"-"+String(mi).padStart(2,"0");
+      var md=bmd(ym);
+      months.push({month:ym,label:mi+"月",leads:md.total.leads,eff_leads:md.total.eff_leads,total_arrive:md.total.total_arrive,eff_arrive:md.total.eff_arrive});
+    }
+    return[200,{month:mo,daily:cur.daily,year:ys,months:months}];
+  }
+  if(q.mode==="range"&&q.start&&q.end){
+    var range=[];
+    var d0=new Date(q.start),d1=new Date(q.end);
+    for(var dt=new Date(d0);dt<=d1;dt.setDate(dt.getDate()+1)){
+      var ds=dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0");
+      var drs=recs.filter(function(r){return r.date===ds;});
+      var l=0,pl=0,el=0,ta=0,ea=0;
+      drs.forEach(function(r){l+=r.leads||0;pl+=r.pass_leads||0;el+=r.eff_leads||0;ta+=r.total_arrive||0;ea+=r.eff_arrive||0;});
+      range.push({date:ds,leads:l,pass_leads:pl,eff_leads:el,total_arrive:ta,eff_arrive:ea});
+    }
+    return[200,{month:mo,daily:cur.daily,range:range,start:q.start,end:q.end}];
+  }
+  return[200,{month:mo,daily:cur.daily}];
 }
 
 function getRecords(tk,q){var u=verify(tk);if(!u)return[401,{error:"未登录"}];var role=u.role,recs=[];if(role==="boss"){recs=D.records.slice();}else{recs=D.records.filter(function(r){return r.user_id===u.id;});}if(q.date)recs=recs.filter(function(r){return r.date===q.date;});recs.sort(function(a,b){return b.date.localeCompare(a.date);});return[200,recs.map(function(r){var usr=D.users.find(function(x){return x.id===r.user_id;});var r2={};for(var k in r)r2[k]=r[k];r2.user_name=usr?usr.name:"";r2.eff_rate=r.leads>0?Math.round(r.eff_leads/r.leads*1000)/10:0;r2.arr_rate=r.total_arrive>0?Math.round(r.eff_arrive/r.total_arrive*1000)/10:0;return r2;})]}
 
 function postChangePwd(tk,b){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(!b.oldPwd||!b.newPwd)return[400,{error:"请填写旧密码和新密码"}];if(b.newPwd.length<6)return[400,{error:"新密码至少6位"}];var r=D.users.find(function(x){return x.id===u.id;});if(!r)return[401,{error:"用户不存在"}];if(r.password!==b.oldPwd)return[401,{error:"旧密码错误"}];r.password=b.newPwd;sv();return[200,{ok:true}];}
 
-function getAccounts(tk){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(u.role!=="boss")return[403,{error:"无权限"}];var acs=D.users.filter(function(x){return x.role==="supervisor";}).map(function(x){var g=D.groups.find(function(gg){return gg.id===x.group_id;});var mems=D.users.filter(function(m){return m.role==="team_member"&&m.parent_id===x.id;});return{id:x.id,name:x.name,username:x.username,group_name:g?g.name:"",member_count:mems.length,record_count:D.records.filter(function(r){return r.user_id===x.id;}).length,members:mems.map(function(m){return{id:m.id,name:m.name,username:m.username};})};});return[200,{accounts:acs,groups:D.groups.map(function(g){return{id:g.id,name:g.name,supervisor_name:g.supervisor_name};})}];}
+
+function getBosses(tk){
+  var u=verify(tk);if(!u)return[401,{error:"未登录"}];
+  if(u.role!=="admin")return[403,{error:"无权限"}];
+  var list=D.users.filter(function(x){return x.role==="boss";}).map(function(x){
+    return{id:x.id,name:x.name,username:x.username,created_at:x.created_at||""};
+  });
+  return[200,{bosses:list}];
+}
+
+function getAccounts(tk){var u=verify(tk);if(!u)return[401,{error:"未登录"}];if(u.role!=="boss"&&u.role!=="admin")return[403,{error:"无权限"}];var acs=D.users.filter(function(x){return x.role==="supervisor";}).map(function(x){var g=D.groups.find(function(gg){return gg.id===x.group_id;});var mems=D.users.filter(function(m){return m.role==="team_member"&&m.parent_id===x.id;});return{id:x.id,name:x.name,username:x.username,group_name:g?g.name:"",member_count:mems.length,record_count:D.records.filter(function(r){return r.user_id===x.id;}).length,members:mems.map(function(m){return{id:m.id,name:m.name,username:m.username};})};});return[200,{accounts:acs,groups:D.groups.map(function(g){return{id:g.id,name:g.name,supervisor_name:g.supervisor_name};})}];}
 
 function postMember(tk,b){
   var u=verify(tk);if(!u)return[401,{error:"未登录"}];
-  if(u.role!=="boss")return[403,{error:"无权限"}];
+  if(u.role!=="boss"&&u.role!=="admin")return[403,{error:"无权限"}];
   if(!b.supervisor_id||!b.name||!b.username||!b.password)return[400,{error:"请填写所有字段"}];
   var sup=D.users.find(function(x){return x.id===b.supervisor_id&&x.role==="supervisor";});
   if(!sup)return[400,{error:"主管不存在"}];
@@ -501,15 +572,18 @@ function route(method,path,tk,body,q){
   if(path==="/api/me"&&method==="GET")return getMe(tk);
   if(path==="/api/dashboard"&&method==="GET")return getDashboard(tk);
   if(path==="/api/supervisors"&&method==="POST")return postSupervisors(tk,body);
+  if(path==="/api/bosses"&&method==="POST")return postBoss(tk,body);
   if(path==="/api/members"&&method==="POST")return postMember(tk,body);
   if(path==="/api/records"&&method==="POST")return postRecords(tk,body);
   if(path==="/api/records"&&method==="GET")return getRecords(tk,q);
   if(path==="/api/change_pwd"&&method==="POST")return postChangePwd(tk,body);
   if(path==="/api/accounts"&&method==="GET")return getAccounts(tk);
+  if(path==="/api/bosses"&&method==="GET")return getBosses(tk);
   if(path==="/api/trends"&&method==="GET")return getTrends(tk,q);
   if(path==="/api/borun-creds"&&method==="GET")return getBorunCreds(tk);
   if(path==="/api/borun-creds"&&method==="POST")return saveBorunCreds(tk,body);
   if(pp[1]==="api"&&pp[2]==="supervisors"&&pp.length===4&&method==="DELETE")return delSupervisor(tk,pp[3]);
+  if(pp[1]==="api"&&pp[2]==="bosses"&&pp.length===4&&method==="DELETE")return delBoss(tk,pp[3]);
   if(pp[1]==="api"&&pp[2]==="members"&&pp.length===4&&method==="DELETE")return delMember(tk,pp[3]);
   return[404,{error:"Not found"}];
 }
@@ -556,13 +630,15 @@ function fmt(n){return Math.round(n).toLocaleString();}
 function pctStr(n){return (Math.round(n*10)/10)+"%";}
 function todayStr(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
 
-var ROLE_LABELS={boss:"总经理",supervisor:"主管",team_member:"员工"};
+var ROLE_LABELS={admin:"管理员",boss:"总经理",supervisor:"主管",team_member:"员工"};
 var STATE={user:null,data:null},CURRENT_PAGE="";
 
 // ===== SIDEBAR =====
 function renderSidebar(){
   var s=document.getElementById("sidebar"),role=STATE.user.role,items=[];
-  if(role==="boss"){
+  if(role==="admin"){
+    items=[{id:"admin_accounts",icon:"👑",label:"总经理账号管理"}];
+  }else if(role==="boss"){
     items=[{id:"main_dash",icon:"📊",label:"益彩晶流量号组看板"},{id:"group_dash",icon:"👥",label:"分组看板"},{id:"import_page",icon:"📋",label:"导入人员表"}];
   }else if(role==="supervisor"){
     items=[{id:"sup_dash",icon:"📊",label:"我的看板"}];
@@ -577,7 +653,7 @@ function renderSidebar(){
   s.innerHTML=h;
 }
 
-function navTo(page){CURRENT_PAGE=page;renderSidebar();if(page==="main_dash")renderBossDash();else if(page==="sup_dash")renderSupDash();else if(page==="member_dash")renderMemberDash();else if(page==="group_dash")renderGroupDash();else if(page==="import_page")renderImportPage();}
+function navTo(page){CURRENT_PAGE=page;renderSidebar();if(page==="main_dash")renderBossDash();else if(page==="sup_dash")renderSupDash();else if(page==="member_dash")renderMemberDash();else if(page==="group_dash")renderGroupDash();else if(page==="import_page")renderImportPage();else if(page==="admin_accounts")renderAdminAccounts();}
 
 // ===== LOGIN =====
 async function tryLogin(){
@@ -603,7 +679,7 @@ function showApp(){
   document.getElementById("userRole").textContent=ROLE_LABELS[STATE.user.role]||"";
   document.getElementById("roleTag").textContent=ROLE_LABELS[STATE.user.role]||"";
   document.getElementById("userAv").textContent=STATE.user.name.charAt(0);
-  CURRENT_PAGE=STATE.user.role==="boss"?"main_dash":(STATE.user.role==="supervisor"?"sup_dash":"member_dash");
+  CURRENT_PAGE=STATE.user.role==="boss"?"main_dash":(STATE.user.role==="supervisor"?"sup_dash":(STATE.user.role==="admin"?"admin_accounts":"member_dash"));
   renderSidebar();navTo(CURRENT_PAGE);
 }
 
@@ -612,30 +688,187 @@ function kpiCard(label,emoji,color,val,sub){
   return "<div class=\"kpi\"><div class=\"label\"><span class=\"dot\" style=\"background:"+color+"\"></span>"+emoji+" "+label+"</div><div class=\"val\">"+val+"</div>"+(sub?"<div class=\"sub\">"+sub+"</div>":"")+"</div>";
 }
 
+
+// ===== ADMIN ACCOUNTS =====
+async function renderAdminAccounts(){
+  var h="<div class=\"page-title\">总经理账号管理</div><div class=\"page-desc\">创建、删除总经理账号（总经理可查看所有主管数据）</div>";
+  h+="<button class=\"btn-sm btn-glow\" onclick=\"showAddBossModal()\" style=\"height:40px;font-size:14px;margin-bottom:16px\">＋ 添加总经理</button>";
+  h+="<div class=\"table-card\"><table><thead><tr><th>姓名</th><th>账号</th><th>创建时间</th><th>操作</th></tr></thead><tbody id=\"bossTableBody\"><tr><td colspan=\"4\" style=\"text-align:center;padding:30px;color:var(--faint)\">加载中…</td></tr></tbody></table></div>";
+  document.getElementById("content").innerHTML=h;
+  loadBosses();
+}
+
+async function loadBosses(){
+  var data=await apiGet("/api/bosses");
+  var h="";
+  (data.bosses||[]).forEach(function(b){
+    h+="<tr><td><b>"+b.name+"</b></td><td>"+b.username+"</td><td>"+(b.created_at||"")+"</td><td><button class=\"btn-sm btn-danger\" onclick=\"deleteBoss('"+b.id+"')\">删除</button></td></tr>";
+  });
+  if(!h)h="<tr><td colspan=\"4\" style=\"text-align:center;padding:30px;color:var(--faint)\">暂无总经理账号</td></tr>";
+  document.getElementById("bossTableBody").innerHTML=h;
+}
+
+function showAddBossModal(){
+  showModal("<div class=\"modal-title\">添加总经理</div><div class=\"field\"><label>姓名</label><input id=\"ab_name\" placeholder=\"如：徐梁\"></div><div class=\"field\"><label>账号</label><input id=\"ab_user\" placeholder=\"如：xuliang\"></div><div class=\"field\"><label>密码</label><input id=\"ab_pwd\" type=\"password\" placeholder=\"默认 123456\"></div><div class=\"btns\"><button class=\"btn-cancel\" onclick=\"closeModal()\">取消</button><button class=\"btn-confirm\" onclick=\"addBoss()\">确认添加</button></div><div class=\"err\" id=\"ab_err\"></div>");
+}
+
+async function addBoss(){
+  var n=document.getElementById("ab_name").value.trim();
+  var u=document.getElementById("ab_user").value.trim();
+  var p=document.getElementById("ab_pwd").value||"123456";
+  var err=document.getElementById("ab_err");
+  if(!n||!u){err.textContent="请填写姓名和账号";return;}
+  try{await apiPost("/api/bosses",{name:n,username:u,password:p});toast("添加成功");closeModal();loadBosses();}catch(e){err.textContent=e.message;}
+}
+
+async function deleteBoss(id){
+  if(!confirm("确定删除此总经理账号？"))return;
+  try{await apiDel("/api/bosses/"+id);toast("已删除");loadBosses();}catch(e){toast(e.message,"err");}
+}
+
 // ===== BOSS DASHBOARD =====
 async function renderBossDash(){
   var data=await apiGet("/api/dashboard");STATE.data=data;
+  var t=data.total||{},dt=data.date||{};
   var h="<div class=\"page-title\">益彩晶流量号组看板</div><div class=\"page-desc\">"+todayStr()+" · 全组数据总览</div>";
-  var total={leads:0,pass_leads:0,eff_leads:0,total_arrive:0,eff_arrive:0};
-  (data.groups||[]).forEach(function(g){total.leads+=g.leads||0;total.pass_leads+=g.pass_leads||0;total.eff_leads+=g.eff_leads||0;total.total_arrive+=g.total_arrive||0;total.eff_arrive+=g.eff_arrive||0;});
-  var effRate=total.leads>0?Math.round(total.eff_leads/total.leads*1000)/10:0;
-  var arrRate=total.total_arrive>0?Math.round(total.eff_arrive/total.total_arrive*1000)/10:0;
+  // 顶部 KPI
   h+="<div class=\"kpi-row\">";
-  h+=kpiCard("总线索","🟦","#0891b2",fmt(total.leads),"");
-  h+=kpiCard("总通过线索","🟩","#059669",fmt(total.pass_leads),"");
-  h+=kpiCard("有效线索","🟪","#7c3aed",fmt(total.eff_leads),"有效率 "+pctStr(effRate));
-  h+=kpiCard("总到诊","🟧","#ea580c",fmt(total.total_arrive),"");
-  h+=kpiCard("有效到诊","🟥","#dc2626",fmt(total.eff_arrive),"到诊率 "+pctStr(arrRate));
+  h+=kpiCard("总线索","🟦","#0891b2",fmt(t.leads||0),"");
+  h+=kpiCard("有效线索","🟪","#7c3aed",fmt(t.eff_leads||0),"有效率 "+pctStr(t.eff_rate||0));
+  h+=kpiCard("无效数","⬜","#94a3b8",fmt(t.invalid||0),"");
+  h+=kpiCard("总到诊","🟧","#ea580c",fmt(t.total_arrive||0),"");
+  h+=kpiCard("有效到诊","🟥","#dc2626",fmt(t.eff_arrive||0),"到诊率 "+pctStr(t.arr_rate||0));
   h+="</div>";
   h+="<div class=\"sync-bar\"><div class=\"sync-info\"><div class=\"sync-icon\">📡</div><div class=\"sync-text\"><b>e.borun.vip 大数据同步</b><span>登录博润系统自动获取数据</span></div></div><button onclick=\"openBorunPanel()\">🔗 登录博润</button></div>";
-  h+="<div class=\"section-title\"><h3>👥 各分组数据</h3></div>";
-  (data.groups||[]).forEach(function(g){
-    var er=g.leads>0?Math.round(g.eff_leads/g.leads*1000)/10:0;
-    var ar=g.total_arrive>0?Math.round(g.eff_arrive/g.total_arrive*1000)/10:0;
-    h+="<div class=\"group-card\" id=\"gc_"+g.id+"\"><div class=\"gc-head\" onclick=\"toggleGroup('"+g.id+"')\"><div class=\"gc-info\"><div class=\"gc-icon\">"+g.name.charAt(0)+"</div><div><div class=\"gc-name\">"+g.name+"</div><div class=\"gc-meta\">"+g.supervisor_name+" · 有效率 "+pctStr(er)+" · 到诊率 "+pctStr(ar)+"</div></div></div><div class=\"gc-stats\"><div class=\"gc-stat\"><div class=\"sv\">"+fmt(g.leads)+"</div><div class=\"sl\">总线索</div></div><div class=\"gc-stat\"><div class=\"sv\">"+fmt(g.eff_leads)+"</div><div class=\"sl\">有效线索</div></div><div class=\"gc-stat\"><div class=\"sv\">"+fmt(g.total_arrive)+"</div><div class=\"sl\">总到诊</div></div><div class=\"gc-stat\"><div class=\"sv\">"+fmt(g.eff_arrive)+"</div><div class=\"sl\">有效到诊</div></div></div><span class=\"gc-arrow\">▼</span></div><div class=\"gc-body\" id=\"gc_body_"+g.id+"\"></div></div>";
+  // 时间选项卡
+  h+="<div style='display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap'>";
+  h+="<button class=\"bp-time-btn bp-btn\" data-range=\"today\" onclick=\"bossRange('today')\" style='flex:1;min-width:70px;background:#0891b2;color:#fff'>今日</button>";
+  h+="<button class=\"bp-time-btn bp-btn\" data-range=\"month\" onclick=\"bossRange('month')\" style='flex:1;min-width:70px'>本月</button>";
+  h+="<button class=\"bp-time-btn bp-btn\" data-range=\"year\" onclick=\"bossRange('year')\" style='flex:1;min-width:70px'>本年</button>";
+  h+="<button class=\"bp-time-btn bp-btn\" data-range=\"custom\" onclick=\"bossRange('custom')\" style='flex:1;min-width:70px'>自定义</button>";
+  h+="</div>";
+  h+="<div id=\"bossCustomRange\" style='display:none;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap'>";
+  h+="<input type='date' id='boss_cs' value='"+(dt.monthStart||'')+"' style='flex:1;min-width:120px;height:38px;border:1.5px solid var(--line);border-radius:10px;padding:0 10px;font-size:13px'>";
+  h+="<span style='color:var(--faint)'>~</span>";
+  h+="<input type='date' id='boss_ce' value='"+(dt.today||'')+"' style='flex:1;min-width:120px;height:38px;border:1.5px solid var(--line);border-radius:10px;padding:0 10px;font-size:13px'>";
+  h+="<button class='btn-sm btn-accent' onclick='bossRangeGo()'>查 询</button>";
+  h+="</div>";
+  // 曲线图容器
+  h+="<div class=\"chart-card\"><div class=\"chart-legend\"><span style=\"color:#0891b2\">● 总线索</span><span style=\"color:#7c3aed\">● 有效线索</span><span style=\"color:#ea580c\">● 总到诊</span><span style=\"color:#dc2626\">● 有效到诊</span></div><div style=\"width:100%;height:300px\"><canvas id=\"bossTrendCanvas\" style=\"width:100%;height:100%\"></canvas></div></div>";
+  // 主管树
+  h+="<div class=\"section-title\"><h3>👥 分组数据（点击展开主管 → 员工）</h3></div>";
+  (data.sups||[]).forEach(function(sup){
+    var er=sup.eff_rate||0,ar=sup.arr_rate||0;
+    h+="<div class=\"group-card\" id=\"bs_"+sup.id+"\"><div class=\"gc-head\" onclick=\"toggleBossSup('"+sup.id+"')\"><div class=\"gc-info\"><div class=\"gc-icon\">"+sup.name.charAt(0)+"</div><div><div class=\"gc-name\">"+sup.group_name+" · "+sup.name+"</div><div class=\"gc-meta\">有效率 "+pctStr(er)+" · 到诊率 "+pctStr(ar)+" · 员工 "+sup.members.length+" 人</div></div></div><div class=\"gc-stats\"><div class=\"gc-stat\"><div class=\"sv\">"+fmt(sup.leads)+"</div><div class=\"sl\">总线索</div></div><div class=\"gc-stat\"><div class=\"sv\">"+fmt(sup.eff_leads)+"</div><div class=\"sl\">有效</div></div><div class=\"gc-stat\"><div class=\"sv\">"+fmt(sup.total_arrive)+"</div><div class=\"sl\">总到诊</div></div><div class=\"gc-stat\"><div class=\"sv\">"+fmt(sup.eff_arrive)+"</div><div class=\"sl\">有效到诊</div></div></div><span class=\"gc-arrow\">▼</span></div><div class=\"gc-body\" id=\"bs_body_"+sup.id+"\"></div></div>";
   });
-  h+="<button class=\"btn-sm btn-glow\" onclick=\"openTrendModal()\" style=\"margin-top:8px;width:100%;height:44px;font-size:15px\">📈 查看趋势曲线图</button>";
   document.getElementById("content").innerHTML=h;
+  // 默认加载本月曲线
+  var now=new Date();
+  bossMonth=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
+  drawBossTrend("month",bossMonth);
+}
+
+var bossMonth="";
+function bossRange(kind){
+  var btns=document.querySelectorAll('.bp-time-btn');
+  btns.forEach(function(b){b.style.background='';b.style.color='';});
+  var now=new Date();
+  if(kind==='today'){
+    document.querySelector('[data-range="today"]').style.background='#0891b2';
+    document.querySelector('[data-range="today"]').style.color='#fff';
+    var ts=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0")+"-"+String(now.getDate()).padStart(2,"0");
+    document.getElementById('bossCustomRange').style.display='none';
+    drawBossTrend("range",ts,ts);
+  }else if(kind==='month'){
+    document.querySelector('[data-range="month"]').style.background='#0891b2';
+    document.querySelector('[data-range="month"]').style.color='#fff';
+    bossMonth=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0");
+    document.getElementById('bossCustomRange').style.display='none';
+    drawBossTrend("month",bossMonth);
+  }else if(kind==='year'){
+    document.querySelector('[data-range="year"]').style.background='#0891b2';
+    document.querySelector('[data-range="year"]').style.color='#fff';
+    document.getElementById('bossCustomRange').style.display='none';
+    drawBossTrend("year",now.getFullYear());
+  }else{
+    document.querySelector('[data-range="custom"]').style.background='#0891b2';
+    document.querySelector('[data-range="custom"]').style.color='#fff';
+    document.getElementById('bossCustomRange').style.display='flex';
+  }
+}
+
+function bossRangeGo(){
+  var s=document.getElementById('boss_cs').value;
+  var e=document.getElementById('boss_ce').value;
+  if(!s||!e){toast('请选择起止日期','err');return;}
+  if(s>e){toast('开始日期不能晚于结束日期','err');return;}
+  drawBossTrend("range",s,e);
+}
+
+async function drawBossTrend(mode,a,b){
+  var canvas=document.getElementById("bossTrendCanvas");
+  if(!canvas)return;
+  var url="/api/trends?mode="+mode;
+  if(mode==="month")url+="&month="+a;
+  else if(mode==="year")url+="&year="+a;
+  else url+="&start="+a+"&end="+b;
+  var data=await apiGet(url);
+  var daily=null;
+  if(mode==="year")daily=data.months||[];
+  else if(mode==="range")daily=data.range||[];
+  else daily=data.daily||[];
+  var ctx=canvas.getContext("2d");
+  var W=canvas.parentElement.clientWidth||700,H=300;
+  canvas.width=W;canvas.height=H;
+  ctx.clearRect(0,0,W,H);
+  if(!daily||daily.length===0){ctx.fillStyle="#94a3b8";ctx.font="14px sans-serif";ctx.textAlign="center";ctx.fillText("暂无数据",W/2,H/2);return;}
+  var metrics=["leads","eff_leads","total_arrive","eff_arrive"];
+  var colors={"leads":"#0891b2","eff_leads":"#7c3aed","total_arrive":"#ea580c","eff_arrive":"#dc2626"};
+  var maxVal=0;
+  daily.forEach(function(d){metrics.forEach(function(m){maxVal=Math.max(maxVal,d[m]||0);});});
+  maxVal=Math.ceil(maxVal*1.2/10)*10||10;
+  var pL=50,pR=15,pT=20,pB=35,cW=W-pL-pR,cH=H-pT-pB;
+  ctx.strokeStyle="#e2e8f0";ctx.lineWidth=1;ctx.font="11px sans-serif";ctx.fillStyle="#94a3b8";ctx.textAlign="right";
+  for(var i=0;i<=5;i++){var y=pT+(cH/5)*i,val=Math.round(maxVal*(5-i)/5);ctx.beginPath();ctx.moveTo(pL,y);ctx.lineTo(W-pR,y);ctx.stroke();ctx.fillText(val,pL-8,y+4);}
+  ctx.textAlign="center";
+  var step=Math.max(1,Math.floor(daily.length/8));
+  daily.forEach(function(d,i){
+    if(i%step===0||i===daily.length-1){
+      var label=mode==="year"?d.label:(d.day||d.date||"").toString().slice(5);
+      ctx.fillText(label,pL+(cW/(daily.length-1||1))*i,H-pB+16);
+    }
+  });
+  metrics.forEach(function(m){
+    ctx.strokeStyle=colors[m];ctx.lineWidth=2.5;ctx.beginPath();
+    daily.forEach(function(d,i){var x=pL+(cW/(daily.length-1||1))*i,y=pT+cH-(d[m]||0)/maxVal*cH;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);});
+    ctx.stroke();
+    var dotStep=Math.max(1,Math.floor(daily.length/20));
+    daily.forEach(function(d,i){
+      if(i%dotStep===0||i===daily.length-1){
+        var x=pL+(cW/(daily.length-1||1))*i,y=pT+cH-(d[m]||0)/maxVal*cH;
+        ctx.fillStyle=colors[m];ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);ctx.fill();
+      }
+    });
+  });
+}
+
+function toggleBossSup(supId){
+  var g=document.getElementById("bs_"+supId);
+  g.classList.toggle("open");
+  var body=document.getElementById("bs_body_"+supId);
+  if(body.innerHTML===""){
+    var sup=(STATE.data.sups||[]).find(function(x){return x.id===supId;});
+    if(!sup)return;
+    var h="";
+    if(sup.members&&sup.members.length>0){
+      sup.members.forEach(function(m){
+        h+="<div class=\"nested-member\"><div class=\"nm-name\">👤 "+m.name+"</div><div class=\"nm-stats\"><span>线索 <b>"+fmt(m.leads)+"</b></span><span>有效 <b>"+fmt(m.eff_leads)+"</b></span><span>无效 <b>"+fmt(m.invalid)+"</b></span><span>到诊 <b>"+fmt(m.eff_arrive)+"</b></span><span class=\"tag-green\">有效率 "+pctStr(m.eff_rate)+"</span></div></div>";
+      });
+    }else{
+      h="<div style='padding:10px;color:var(--faint);text-align:center'>该主管暂无员工</div>";
+    }
+    body.innerHTML=h;
+  }
 }
 
 function toggleGroup(gid){

@@ -289,10 +289,10 @@ tr:hover td{background:rgba(236,254,255,.3)}
 .l-hero{position:absolute;inset:0;overflow:hidden;background:#0a0908}
 .l-base{position:absolute;inset:0;background:url('assets/dune.jpg') center/cover no-repeat;animation:lZoom 2.4s cubic-bezier(.16,1,.3,1) forwards;transform:scale(1.08)}
 .l-base::after{content:"";position:absolute;inset:0;background:linear-gradient(to bottom,rgba(10,9,8,.5) 0%,rgba(10,9,8,.3) 40%,rgba(10,9,8,.88) 100%),radial-gradient(120% 90% at 50% 40%,transparent 30%,rgba(10,9,8,.6) 100%)}
-.l-glow{position:absolute;border-radius:50%;filter:blur(90px);pointer-events:none;opacity:.5}
+.l-glow{position:absolute;border-radius:50%;filter:blur(50px);pointer-events:none;opacity:.45;will-change:transform}
 .l-glow.lg1{width:520px;height:520px;left:-120px;top:-100px;background:rgba(232,112,42,.28);animation:lDrift 14s ease-in-out infinite}
 .l-glow.lg2{width:460px;height:460px;right:-100px;bottom:-80px;background:rgba(255,180,90,.18);animation:lDrift 18s ease-in-out infinite reverse}
-.l-reveal{position:absolute;inset:0;pointer-events:none;background:url('assets/dune.jpg') center/cover no-repeat;-webkit-mask-image:none;mask-image:none;-webkit-mask-size:100% 100%;mask-size:100% 100%}
+.l-reveal{position:absolute;inset:0;pointer-events:none;background:url('assets/dune.jpg') center/cover no-repeat;-webkit-mask-image:radial-gradient(circle 300px at var(--mx,-999px) var(--my,-999px),#fff 0%,#fff 40%,rgba(255,255,255,.75) 60%,rgba(255,255,255,.4) 75%,rgba(255,255,255,.12) 88%,transparent 100%);mask-image:radial-gradient(circle 300px at var(--mx,-999px) var(--my,-999px),#fff 0%,#fff 40%,rgba(255,255,255,.75) 60%,rgba(255,255,255,.4) 75%,rgba(255,255,255,.12) 88%,transparent 100%);-webkit-mask-size:100% 100%;mask-size:100% 100%}
 .l-spots{position:absolute;inset:0}
 .l-spots i{position:absolute;display:block;border-radius:50%;filter:blur(46px);mix-blend-mode:screen}
 .l-spots i.v1{width:220px;height:220px;left:16%;top:30%;background:rgba(255,244,235,.34)}
@@ -301,7 +301,6 @@ tr:hover td{background:rgba(236,254,255,.3)}
 .l-spots i.p2{width:130px;height:130px;right:12%;top:22%;background:rgba(232,100,60,.42)}
 .l-spots i.p3{width:160px;height:160px;left:8%;bottom:34%;background:rgba(255,150,90,.36)}
 .l-tint{position:absolute;inset:0;background:radial-gradient(90% 70% at 50% 60%,rgba(255,170,90,.22),transparent 70%),linear-gradient(to bottom,rgba(10,9,8,.2),rgba(10,9,8,.55))}
-#spotCanvas{position:absolute;inset:0;pointer-events:none;display:none;z-index:40}
 .l-logo{position:absolute;top:26px;left:34px;z-index:80;display:flex;align-items:center;gap:10px}
 .l-logo span{font-size:19px;font-weight:600;letter-spacing:.02em;color:#fff}
 .l-center{position:absolute;z-index:70;top:50%;left:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;width:min(420px,92vw)}
@@ -373,7 +372,6 @@ tr:hover td{background:rgba(236,254,255,.3)}
       <div class="l-err" id="loginErr"></div>
     </div>
   </div>
-  <canvas id="spotCanvas"></canvas>
 </div>
 
 <div id="app"><div id="app"><div id="app">
@@ -751,53 +749,34 @@ function showApp(){
 }
 
 
-// ===== 登录页 spotlight 揭示 =====
-(function(){
-  var SPOTLIGHT_R=300,mouse={x:-999,y:-999},smooth={x:-999,y:-999},raf=null,pos={x:-999,y:-999};
-  var canvas=document.getElementById('spotCanvas'),reveal=document.getElementById('lReveal');
-  if(!canvas||!reveal)return;
-  var ctx=canvas.getContext('2d');
-  function sz(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
-  sz();window.addEventListener('resize',sz);
-  window.addEventListener('mousemove',function(e){mouse.x=e.clientX;mouse.y=e.clientY;});
-  function loop(){smooth.x+=(mouse.x-smooth.x)*0.09;smooth.y+=(mouse.y-smooth.y)*0.09;pos.x=Math.round(smooth.x);pos.y=Math.round(smooth.y);draw();raf=requestAnimationFrame(loop);}
-  function draw(){
-    var loginEl=document.getElementById('login');
-    if(!loginEl||loginEl.style.display==='none'){reveal.style.webkitMaskImage='none';reveal.style.maskImage='none';return;}
-    var x=pos.x,y=pos.y;
-    if(x<0){reveal.style.webkitMaskImage='none';reveal.style.maskImage='none';return;}
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    var g=ctx.createRadialGradient(x,y,0,x,y,SPOTLIGHT_R);
-    g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(0.4,'rgba(255,255,255,1)');g.addColorStop(0.6,'rgba(255,255,255,0.75)');g.addColorStop(0.75,'rgba(255,255,255,0.4)');g.addColorStop(0.88,'rgba(255,255,255,0.12)');g.addColorStop(1,'rgba(255,255,255,0)');
-    ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,SPOTLIGHT_R,0,Math.PI*2);ctx.fill();
-    var url=canvas.toDataURL();
-    reveal.style.webkitMaskImage='url('+url+')';reveal.style.maskImage='url('+url+')';reveal.style.webkitMaskSize='100% 100%';reveal.style.maskSize='100% 100%';
-  }
-  raf=requestAnimationFrame(loop);
-})();
 
 
-// ===== 登录页 spotlight 揭示 =====
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ===== 登录页 spotlight 揭示（CSS 变量版，零开销）=====
 (function(){
-  var SPOTLIGHT_R=300,mouse={x:-999,y:-999},smooth={x:-999,y:-999},raf=null,pos={x:-999,y:-999};
-  var canvas=document.getElementById('spotCanvas'),reveal=document.getElementById('lReveal');
-  if(!canvas||!reveal)return;
-  var ctx=canvas.getContext('2d');
-  function sz(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
-  sz();window.addEventListener('resize',sz);
+  var mouse={x:-999,y:-999},smooth={x:-999,y:-999},raf=null;
+  var reveal=document.getElementById('lReveal');
+  if(!reveal)return;
   window.addEventListener('mousemove',function(e){mouse.x=e.clientX;mouse.y=e.clientY;});
-  function loop(){smooth.x+=(mouse.x-smooth.x)*0.09;smooth.y+=(mouse.y-smooth.y)*0.09;pos.x=Math.round(smooth.x);pos.y=Math.round(smooth.y);draw();raf=requestAnimationFrame(loop);}
-  function draw(){
+  function loop(){
     var loginEl=document.getElementById('login');
-    if(!loginEl||loginEl.style.display==='none'){reveal.style.webkitMaskImage='none';reveal.style.maskImage='none';return;}
-    var x=pos.x,y=pos.y;
-    if(x<0){reveal.style.webkitMaskImage='none';reveal.style.maskImage='none';return;}
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    var g=ctx.createRadialGradient(x,y,0,x,y,SPOTLIGHT_R);
-    g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(0.4,'rgba(255,255,255,1)');g.addColorStop(0.6,'rgba(255,255,255,0.75)');g.addColorStop(0.75,'rgba(255,255,255,0.4)');g.addColorStop(0.88,'rgba(255,255,255,0.12)');g.addColorStop(1,'rgba(255,255,255,0)');
-    ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,SPOTLIGHT_R,0,Math.PI*2);ctx.fill();
-    var url=canvas.toDataURL();
-    reveal.style.webkitMaskImage='url('+url+')';reveal.style.maskImage='url('+url+')';reveal.style.webkitMaskSize='100% 100%';reveal.style.maskSize='100% 100%';
+    if(!loginEl||loginEl.style.display==='none'){raf=null;return;}
+    smooth.x+=(mouse.x-smooth.x)*0.09;smooth.y+=(mouse.y-smooth.y)*0.09;
+    reveal.style.setProperty('--mx',Math.round(smooth.x)+'px');
+    reveal.style.setProperty('--my',Math.round(smooth.y)+'px');
+    raf=requestAnimationFrame(loop);
   }
   raf=requestAnimationFrame(loop);
 })();
